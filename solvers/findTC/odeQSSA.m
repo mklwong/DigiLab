@@ -86,14 +86,14 @@ inpFun = @(t)zeros(length(x0),1);
 %Input values: make all into either function handles or vectors
 % This component looks at the experiment-simulation name pair, then
 % compares the experiment name with the name given in the 
-if iscell(tmpInp) %state-name val pair
-	expProt = model.pFit.sim2dat;
+if iscell(tmpInp) %state name-val pair
+	protList = model.x.name;
 	inpFunInd = [];
 	inpConstInd = [];
 	for ii = 1:size(tmpInp,1)
 		if ischar(tmpInp{ii,1})
-			[~,stateInd] = intersect(upper(expProt(:,1)),upper(tmpInp{ii,1})); % Match input state
-			tmpInp{ii,1} = abs(expProt{stateInd,2});
+			[~,stateInd] = intersect(upper(protList),upper(tmpInp{ii,1})); % Match input state
+			tmpInp{ii,1} = stateInd; %Replace the name with index
 			%Separate spikes and gradual inputs
 			if ~isempty(stateInd)
 				if isa(tmpInp{ii,2},'function_handle')
