@@ -7,20 +7,16 @@
 %% Forward: Parameters
 % A common feature in these model files is the idea of a "parameter". Any
 % variable that is a parameter is defined using six potential formats:
-%	1) [val]        : Known and fixed parameter
-%	2) [NaN]        : Unknown parameter, default range used
-%   3) [-grp]       : Unknown parameter that is grouped. Default range used.
-%                     Multiplicative factor is assumed to be one.
-%	4) [NaN lb ub]  : Unknown parameter, custom range
-%   5) [-grp lb ub] : Unknown parameter with other parameters with the same
-%                     value, custom range.
-%   6) [-grp factor]: Unknown parameter that is a multiplicative factor of
-%                     another parameter. Parameter of this format is the
-%                     dependent.
+%	1) [val]           : Known and fixed parameter
+%	2) [NaN]           : Unknown parameter, default range used
+%	3) [NaN lb ub]     : Unknown parameter, custom range
+%   5) [grp*i]         : Unknown parameter with other parameters with the same
+%                        value, custom range. Note the "i" is iota, i.e. imaginary.
+%   6) [factor + grp*i]: Unknown parameter that is a multiplicative factor of
+%                        another parameter. Parameter of this format is
+%                        dependent. Note the "i" is iota, i.e. imaginary.
 % grp is a positive integer. All parameters with grp that is the same
-% integer are in the same group. To distinguish it from "val", the first
-% element of the vector is negative is it indicates an unknown parameter
-% that is part of a group.
+% integer are in the same group.
 
 %% Compartment definition
 %
