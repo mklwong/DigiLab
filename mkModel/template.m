@@ -4,7 +4,6 @@
 % once you are familiar with how to create a model. Leave the lines with
 % '%%'.
 
-
 %% Forward: Parameters
 % A common feature in these model files is the idea of a "parameter". Any
 % variable that is a parameter is defined using six potential formats:
@@ -24,6 +23,7 @@
 % that is part of a group.
 
 %% Compartment definition
+%
 % xComp = {'Compartment name', relative size};
 %
 % ~~~Guide~~~
@@ -45,6 +45,7 @@ xComp = {'Cyto', 1;
         };
 
 %% Model species definition
+%
 % xMod ={'State name', 'Compatment'  , conc/param};
 %
 % ~~~Guide~~~
@@ -58,29 +59,35 @@ xComp = {'Cyto', 1;
 % We are modelling the protein AKT. It can either be cytosolic or plasma
 % membrane bound. It has two phosphorylation sites and can be dual
 % phosphorylated. AKT initially exists unphosphorylated and in the cytosol.
+% mTORC2 is also included to phosphorylation AKT.
 % We would define this by:
 %
-xMod = {'AKT'     ,'Cyto',NaN;
-        'mAKT'    ,'PM',  0;
-        'p473mAKT','PM',  0;
-        'p473AKT' ,'Cyto',0;};
-
-
+xMod = {'AKT'     ,'Cyto', NaN;
+        'mAKT'    ,'PM'  , 0;
+        'p473mAKT','PM'  , 0;
+        'p473AKT' ,'Cyto', 0;
+        'mTORC2'  ,'PM'  , 1};
 
 %% Relationship between simulation state and model state association
 
-xData = {'Exp Name',{'*Sim 1','*Sim 2'}};
+% xData = {'Exp State Name',{'Sim State Name 1','Sim State Name 2'}};
+
 % ~~~Guide~~~
+%
+% Overview: The way this is designed is each experiment state is
+% "constructed" from the simulated states. Thus one experimental states
+% maps to multiple simulated states.
+%
+% Specifics:
 % "Exp Name" is the name of the state as labelled in the experimental
 % data.
 %
-% "Sim 1" and "Sim 2" are the state names as labelled in the simulation.
-% Each row relates the experimental state to a set of equivalent states
-% in the simulation. The results of the states are added together and
-% then compared to the experimental state.
+% "Sim State Name 1" and "Sim State Name 2" are the state names as labelled
+% in the simulation. The states included are summed together.
 %
 % An asterix (*) at the front of simulation state names implies the
-% enzyme-substate complexes for that state is included as well.
+% implicit complexes for that state (calculated by not created explicitly
+% in xMod, such as ES complexes) are included as well.
 %
 %
 % ~~~Example~~~
@@ -88,67 +95,72 @@ xData = {'Exp Name',{'*Sim 1','*Sim 2'}};
 % experiment is a Western Blot without cell fractionation, hence plasma
 % membrane and cytosolic AKT are captured. In our model the two pools of
 % AKT are discrete, hence the group of simulation states corresponding to
-% the experimental state is p473AKT and p473mAKT. Additionally, enzyme
+% the experimental state are p473AKT and p473mAKT. Additionally, enzyme
 % substrate complexes for both the simulation states are included, so they
 % need to be asterixed.
 %
 % The final row for xData is hence:
-%	- {'p473AKT',{'*p473AKT',p473mAKT'}}
-%       ^string    ^asterix
-%     of name of    marks the
-%     name of exp   E-S complex
-%     state         is included
+ xData = {'p473AKT',{'*p473AKT','*p473mAKT'}};
 
 %% Features of default parameters
+%
+% Bnd* = [lb ub]
+% * is the parameter type
+%
+% ~~~Guide~~~
+% The above gives the default boundaries for each type of parameter. There
+% are currently five parameter types:
+%   k0   - Zeroth order synthesis type
+%   k1   - First order degradataion type
+%   k2   - Second order associaition type
+%   Km   - Association/Dissociation/Michaelis constant type
+%   Conc - Concentration type
+%
 Bndk0  = [1e01 1e04];
 Bndk1  = [5e-5 0.5];
 Bndk2   = [5e-5 5e-1];
 BndKm   = [1e-2 1e02];
 BndConc = [1e-1 1e1];
-% ~~~Guide~~~
-% The above gives the default boundaries for each type of parameter. The
-% variable names above are "bound - param type". So Bndk0 is the boundary
-% of k0 type parameters. k0 type are zeroth order types.
-%
-% All that needs to be done is to place the lower and upper bound enclosed
-% in square brackets.
 
 %% Reactions
-v(end+1).label = 'S->P | E';
-    v(end).sub = 'S';  
-    v(end).prod= 'P'; 
-    v(end).enz = 'E';
-	v(end).Km  = NaN; 
-    v(end).k  = [-1]; 
+%
 % ~~~Guide~~~
-% The above defines a reaction. The first line is alway:
-%	>  v(end+1).label = 
-%	A string (i.e. letters enclosed in ' ). This is simply used to label
-%	the parameters on output. So pick a label that describes the reaction
-% The following lines define the participating species and reaction
-% parameters. For reactants, begin the line with:
-%	> v(end).sub =
-%	Note: Maximum of two reactants are allowed.
-% For products begin the line with:
-%	> v(end).prod =
-% For enzymes, begin the line with:
-%	> v(end).enz =
-%   Note: maximum of 1 enzyme is allowed.
-% For each of the above, list the species within braces, and enclose each
-% species in inverted commas separated by commas. E.g: {'AKT','PIP3'}. The
-% braces can be ignored if only one species is used.
 %
-% The number of reactants, product and enzymes used will determine the
-% reaction type. This is classified by the program.
+% Reactions are stored in the variable rxn. Each reaction has
+% between 3 to 6 fields depending on the reaction to be created. (c) marks
+% fields that are compulsory. The fields are:
+%   - Label (c): Identifier of the reaction. Used for labelling outputs.
+%   - k     (c): Reaction rate. Is a parameter.
+%   - Sub      : List of substrates written as a cell array.
+%   - Prod     : List of products written as a cell array.
+%   - Enz      : Mediating enzyme
+%   - Km       : Michaelis Constant for enzymatic reaction. Is a parameter.
+%   
+% Begin a new reaction by placing (end+1) after rxn. Continue a reaction by
+% placing (end) after rxn [The reason for this is due to programming. Just
+% follow this rule and you will not run into trouble].
+
+% The combination used for each reaction determines the rules used in the
+% backend of the program. This will be explained more later.
 %
-% For parameters, two parameter types are allowed:
-%	> v(end).k  = 
-%	This is a normal rate parameters
-%	> v(end).Km  = 
-%	This is a quasi-steady state parameter (includes Michaelis constant and
-%	dissociation constants).
-%
-% Again the definition of the parameters defines the way the reaction is
-% implemented. E.g. only k given models by mass action, only Km given
-% models as quasi steady state, both k and Km given models as enzyme
-% reaction using dQSSA.
+% For example, with an unknown Km and a known reaction rate of 0.1mol/s,
+% the phosphorylation of AKT at the membrane by mTORC2 can be written as:
+
+rxn(end+1).label = 'mAKT -> p473mAKT | mTORC2';
+    rxn(end).sub = 'mAKT';  
+    rxn(end).prod= 'p473mAKT'; 
+    rxn(end).enz = 'mTORC2';
+	rxn(end).Km  = NaN; 
+    rxn(end).k   = 0.1; 
+
+ % More information on types of reactions:
+ % If the fields (excluding label and k) are:
+ %      - 1 Sub: Degradataion
+ %      - 1 Sub, 1 Enz: Enzyme mediated degradataion
+ %      - 1 Sub, 1 Prod : Transformation
+ %      - 1 Sub, 2+ Prod: dissociation
+ %      - 2 Sub, 1 Prod : Association 
+ %      - 1 Prod: Constant synthesis
+ %      - 1 Prod, 1 Enz: Enzyme mediated synthesis
+ %      - 1 Sub, 1 Enz, Prod: Enzymatic reaction that can produce any 
+ %        number of products
