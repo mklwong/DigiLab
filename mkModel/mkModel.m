@@ -1,17 +1,32 @@
-function mkModel(name)
+function mkModel(name,clean)
 %
-% mkModel(name)
+% mkModel(name,clean)
 %	Creates a new model for kinetic modelling from the model file template
 %	with filename "name". Opens the file on run end.
+%    
+%   The clean option allows creation of a model file with no creation
+%   guide.
 
 if exist([name '.m'],'file')
-	fprintf('Model already exists. Opening file.\n')
-else
-	curDir = which(mfilename);
-	strfind(curDir,'\');
-	rmIndx = max(strfind(curDir,'\'));
-	curDir(rmIndx+1:end) = [];
-	curDir = [curDir 'template.m'];
-	copyfile(curDir,[name '.m'])
+	rePlc = input('Model already exists. Replace (y/n)? ','s');
+    if strcmpi(rePlc,'y')
+        rePlc = input('No backup will be made. Are you sure (y/n)? ','s');
+    end
+    if strcmpi(rePlc,'n')
+        open([name '.m'])
+        return
+    end
 end
+
+curDir = which(mfilename);
+strfind(curDir,'\');
+rmIndx = max(strfind(curDir,'\'));
+curDir(rmIndx+1:end) = [];
+if nargin == 2
+    curDir = [curDir 'template-clean.m'];
+else
+    curDir = [curDir 'template.m'];
+end
+copyfile(curDir,[name '.m'])
+
 open([name '.m'])
