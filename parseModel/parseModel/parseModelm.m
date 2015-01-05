@@ -135,14 +135,15 @@ if isa(model,'function_handle')
 	model = func2str(model);
 end
 
-if size(v) > 1
-    error('Please change all v in your model file into rxn. v no longer recognised as reaction network variable')
-end
-%%
-
 out.name = model;
 xMod = [];
 run(model); %loads xMod and v, xData and boundaries from model
+
+rxn(1) = [];
+% Legacy code
+if size(v) > 1
+    error('Please change all v in your model file into rxn. v no longer recognised as reaction network variable')
+end
 
 % Convenience functions
 notFixed = @(val) (isnan(val) || val < 0);
@@ -156,6 +157,8 @@ tall = @(struct) min([find(isnan(struct.tens(:,1)),1,'first')-1 length(struct.te
 %% Initialise Output Structs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 pFit.desc = cell(100,1); pFit.lim  = nan(100,2);
+curParamIndx = 0;
+storeGrp = [-1,-1];
 
 repInd  = []; %repeatedly used parameters (in multiple contexts)
 
@@ -170,175 +173,64 @@ k0.tens = nan(100,2); k0.sign = nan(100,1); k0.pInd = nan(100,2); k0.factor  = n
 [a,~]     = size(xMod);
 x.tens    = nan(a,1);    % Initial concentration
 x.name    = cell(a,1);   % Species name
-x.comp    = ones(a,1);    % Compartment Index
-x.selfLoc = nan(a,1);
-x.pInd    = nan(a,1);
-x.factor  = nan(a,1);
+x.comp    = ones(a,1);   % Compartment Index
+x.pInd    = nan(a,1);    % Vector showing the parameter index a free state will use
 
 for ii = 1:a
+    % Save Name
 	x.name{ii} = xMod{ii,1};
+    
+    % Get compartment size for each species
 	[~,comptIndx] = intersect(upper(xComp(:,1)),upper(xMod{ii,2}));
 	x.comp(ii) = xComp{comptIndx,2};
-	x.tens(ii) = xMod{ii,3}(1);
-	if notFixed(xMod{ii,3}(1))
-		x.tens(ii) = 0;
-		text = ['Conc - ' xMod{ii,1}];
-		if length(xMod{ii,3})==2 && xMod{ii,3}(1) < 0
-			fact = xMod{ii,3}(2);
-		else
-			fact = 1;
-		end
-		[pFit,repInd,pInd] = getIndmkLabel(pFit,xMod{ii,3},BndConc,repInd,text);
-			% This function determines the current p index, compiles list
-			% of repeated p indices, and stores the description (given in
-			% "text" into the correct p index in pFit.desc
-		
-		x.pInd(tall(x),1)    = pInd; % store p index the variable x0 represents
-		x.selfLoc(tall(x),1) = ii;   % Store index of x0 that's variable
-		x.factor(tall(x),1)  = fact; % multiplicative factor
-	end
+
+    % Process parameter
+    [val,freeParam,grp] = testPar(xMod{ii,3});
+    
+	x.tens(ii) = val; % Save either parameter value of parameter multiplicative factor
+    
+    if freeParam
+        if ~all(grp~=storeGrp)            %%existing group of free parameters
+            x.pInd(ii) = storeGrp(grp==storeGrp,2);
+        else                             %% ungrouped or new group of free parameter
+            curParamIndx = curParamIndx + 1; % New parameter required
+
+            %Make new group
+            if grp ~= 0                  
+                storeGrp(end+1,:) = [grp curParamIndx];
+            end
+
+            % Set parameter boundary
+            if length(xMod{ii,3}) == 3       %% If there is custom set boundary
+                pFit.lim(curParamIndx,:) = xMod{ii,3}(2:3);
+            else                             %% Else use default boundary
+                pFit.lim(curParamIndx,:) = BndConc;
+            end
+            pFit.desc{curParamIndx}	= ['Conc - ' xMod{ii,1}];
+            x.pInd(ii) = curParamIndx; % store p index the variable x0 represents
+        end
+    end
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over list of Reactions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for ii=1:length(rxn)
-	[~,~,subIndx]  = intersect(upper(rxn(ii).sub) ,upper(x.name));
-	[~,~,prodIndx] = intersect(upper(rxn(ii).prod),upper(x.name));
-	[~,~,enzIndx]  = intersect(upper(rxn(ii).enz) ,upper(x.name));
 	
-	% Reaction classifier (based on number of substrates)
-	nSub = length(subIndx);
-	if nSub ==0
-		if ~isempty(rxn(ii).enz) 
-			subIndx  = [enzIndx subIndx];
-			prodIndx = [enzIndx prodIndx];
-			rxnType = 'uni';
-		else
-			rxnType = 'syn';
-		end
-	elseif nSub == 1
-		if ~isempty(rxn(ii).enz) 
-			if isempty(rxn(ii).Km)
-				subIndx  = [enzIndx subIndx];
-				prodIndx = [enzIndx prodIndx];
-				rxnType = 'bi';
-			elseif ~isempty(rxn(ii).Km)
-				rxnType = 'enzQSSA';
-			else
-				error('parseModelm:exceptionClassifier1','Unknown error');
-			end
-		else
-			rxnType = 'uni';
-		end
-	elseif nSub == 2
-		rxnType = 'bi';
-	else
-		error('parseModelm:TooManySubstrates',['There are too many substrates in reaction ' num2str(ii)])
-	end
+	%% Reaction classifier (based on number of substrates)
+    [subIndx,prodIndx,rxnType] = classifyReaction(rxn(ii),x);
+    
+	%% Determine if parameters are free or not
+    % Test 'k'
+    testVal = rxn.k;
+    [val(1),freeParam(1),factor(1)] = testPar(testVal);
+
+    % Test 'Km'
+    testVal = rxn.Km;
+    [val(2),freeParam(2),factor(2)] = testPar(testVal);
 	
-	% Determine if parameters are free or not
-	factor = [1 1]; %default factor
-	val = [0 0];
-	freeParam = [false false];
-	rateParam = {'k','Km'};
-	for jj = 1:length(rateParam)
-		testVal = rxn(ii).(rateParam{jj});
-		if isempty(testVal)
-			continue;
-		elseif ~isreal(testVal(1)) % Is a free param, but part of a group with the same param, but multiplicative factor. The "imaginary" number is used to group. The real part is the factor.
-			val(jj) = NaN;
-			freeParam(jj) = true;
-			factor(jj) = real(testVal);
-		elseif isnan(testVal(1))
-			val(jj) = NaN;
-			freeParam(jj) = true;
-		else
-			val(jj) = testVal(1);
-			freeParam(jj) = false;
-		end
-	end
-	
-	% Set tensor targets and values based on reaction type
-	switch rxnType
-		case 'syn'
-			tensInd   = {tall(k0)+(1:length(prodIndx))};
-			tensVal   = {[prodIndx' 0*prodIndx'+val(1)]};
-			sign      = {0*prodIndx'+1};
-			bnd       = {Bndk0};
-			reqTens   = {'k0'};
-			paramDesc = {['k    : phi -> ' x.name{prodIndx}]};
-		case 'uni' %or degradation
-			tensInd   = {tall(k1)+(1:length(prodIndx)+1)};
-			tensVal   = {[subIndx         subIndx              -val(1);
-				          prodIndx' (subIndx+0*prodIndx)' 0*prodIndx'+val(1)]};
-			sign      = {[-1;0*prodIndx'+1]};
-			bnd       = {Bndk1};
-			reqTens   = {'k1'};
-			if (length(subIndx)==length(prodIndx))==1
-				paramDesc = {['k    : ' x.name{subIndx} ' -> ' x.name{prodIndx}];};
-			elseif isempty(prodIndx)
-				paramDesc = {['k    : ' x.name{subIndx} ' -> phi'];};
-			elseif subIndx(1)==prodIndx(1)
-				paramDesc = {['k    : phi -> ' x.name{prodIndx(2:end)} ' | ' x.name{subIndx}];};
-			end
-		case 'bi'  %or mass action enzyme kinetics
-			tensInd   = {tall(k2)+(1:length(prodIndx)+2)};
-			tensVal   = {[[subIndx(1) subIndx(1) subIndx(2) -val(1);
-				           subIndx(2) subIndx(1) subIndx(2) -val(1)];
-						  [prodIndx' ones(size(prodIndx',1),1)*[subIndx(1) subIndx(2)] prodIndx'*0+val(1)]]};
-			sign      = {[-1;-1;0*prodIndx'+1]};
-			bnd       = {Bndk2};
-			reqTens   = {'k2'};
-			if isempty(rxn(ii).enz)
-				paramDesc = {['k    : ' x.name{subIndx} ' -> ' x.name{prodIndx}];};
-			elseif length(prodIndx)==2
-				paramDesc = {['kc/Km: ' x.name{subIndx(2)} ' -> ' x.name{prodIndx(2)} '| ' x.name{subIndx(1)}]};
-			elseif length(prodIndx)==1
-				paramDesc = {['kc/Km: ' x.name{subIndx(2)} ' ->  phi | ' x.name{subIndx(1)}]};
-			end
-		case 'enzQSSA'
-			if expComp
-				%Make new complex species
-				comIndx = tall(x)+1;
-				x.name{comIndx} = [x.name{subIndx} '-' x.name{enzIndx}];
-				x.comp(comIndx) = -x.comp(subIndx); %Assume complex formed is in same compartment as substrate
-				x.tens(comIndx) = 0;
-				x.pInd(comIndx)    = NaN;
-				x.selfLoc(comIndx) = NaN;
-				
-				tensInd   = {tall(k1)+(1:length(prodIndx)+1);
-							 tall(G)+(1:6)};
-				tensVal   = {[subIndx  comIndx -val(1);
-					          prodIndx' ones(size(prodIndx',1),1)*[comIndx  val(1)]];
-							 [subIndx subIndx enzIndx  1/val(2);
-							  subIndx enzIndx subIndx  1/val(2);
-							  enzIndx subIndx enzIndx  1/val(2);
-							  enzIndx enzIndx subIndx  1/val(2);
-							  comIndx subIndx enzIndx -1/val(2);
-							  comIndx enzIndx subIndx -1/val(2)]};
-				sign      = {[-1 1],[1 1 1 1 -1 -1]};
-				bnd       = {Bndk1,BndKm};
-				reqTens   = {'k1','G'};
-				paramDesc = {['kc   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
-					         ['Km   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-			else
-				tensInd   = {tall(k1)+(1:length(prodIndx)+1);
-							 tall(G)+1:4};
-				tensVal   = {[subIndx  subIndz enzIndx -val(1);
-					          prodIndx' ones(size(prodIndx',1),1)*[subIndz enzIndx  val(1)]];
-							  [subIndx subIndx enzIndx  1/val(2);
-							   subIndx enzIndx subIndx  1/val(2);
-							   enzIndx subIndx enzIndx  1/val(2);
-							   enzIndx enzIndx subIndx  1/val(2)]};
-				sign      = {[-1 1];
-					         [1 1 1 1]};
-				bnd       = {Bndk2;pBndG};
-				reqTens   = {'k2','G'};
-				paramDesc = {['kc/Km : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
-					         ['Km    : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-			end
-	end
+	%% Set tensor targets and values based on reaction type
+    parseRxn(rxnType,prodIndx,subIndx,val,x)
 	
 	% Insert values into tensors. Expand tensors are necessary
     for jj = 1:length(reqTens);
