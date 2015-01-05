@@ -15,9 +15,6 @@ LTmp = sparse(k2(:,1),k2(:,2),k2(:,4).*x(k2(:,3)));
 [a,b] = size(LTmp);
 L(1:a,1:b) = LTmp;
 
-	try
-		dx_dt = (eye(length(x))+M)\(L*x+k1*x+k0(t));
-	catch err
-		keyboard
-	end
+dx_dt = (eye(length(x))+M)\(L*x+k1*x+k0(t));
+keyboard
 end
