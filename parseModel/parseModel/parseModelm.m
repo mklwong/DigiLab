@@ -121,17 +121,25 @@ end
 %%%%%%%%%%%%%%%%%%%%%
 %% Import model file
 %%%%%%%%%%%%%%%%%%%%%
-v = struct();
-v(end).label = [];
-    v(end).sub = [];  
-    v(end).prod= []; 
-    v(end).enz = [];
-	v(end).Km = [];
-    v(end).k  = [];  
-v(1) = [];
+rxn = struct();
+rxn(end).label = [];
+    rxn(end).sub = [];  
+    rxn(end).prod= []; 
+    rxn(end).enz = [];
+	rxn(end).Km = [];
+    rxn(end).k  = [];  
+    
+v = rxn; %Legacy code. For backward compatibility.
+
 if isa(model,'function_handle')
 	model = func2str(model);
 end
+
+if size(v) > 1
+    error('Please change all v in your model file into rxn. v no longer recognised as reaction network variable')
+end
+%%
+
 out.name = model;
 xMod = [];
 run(model); %loads xMod and v, xData and boundaries from model
@@ -194,15 +202,15 @@ end
 %% Cycle over list of Reactions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-for ii=1:length(v)
-	[~,~,subIndx]  = intersect(upper(v(ii).sub) ,upper(x.name));
-	[~,~,prodIndx] = intersect(upper(v(ii).prod),upper(x.name));
-	[~,~,enzIndx]  = intersect(upper(v(ii).enz) ,upper(x.name));
+for ii=1:length(rxn)
+	[~,~,subIndx]  = intersect(upper(rxn(ii).sub) ,upper(x.name));
+	[~,~,prodIndx] = intersect(upper(rxn(ii).prod),upper(x.name));
+	[~,~,enzIndx]  = intersect(upper(rxn(ii).enz) ,upper(x.name));
 	
 	% Reaction classifier (based on number of substrates)
 	nSub = length(subIndx);
 	if nSub ==0
-		if ~isempty(v(ii).enz) 
+		if ~isempty(rxn(ii).enz) 
 			subIndx  = [enzIndx subIndx];
 			prodIndx = [enzIndx prodIndx];
 			rxnType = 'uni';
@@ -210,12 +218,12 @@ for ii=1:length(v)
 			rxnType = 'syn';
 		end
 	elseif nSub == 1
-		if ~isempty(v(ii).enz) 
-			if isempty(v(ii).Km)
+		if ~isempty(rxn(ii).enz) 
+			if isempty(rxn(ii).Km)
 				subIndx  = [enzIndx subIndx];
 				prodIndx = [enzIndx prodIndx];
 				rxnType = 'bi';
-			elseif ~isempty(v(ii).Km)
+			elseif ~isempty(rxn(ii).Km)
 				rxnType = 'enzQSSA';
 			else
 				error('parseModelm:exceptionClassifier1','Unknown error');
@@ -235,7 +243,7 @@ for ii=1:length(v)
 	freeParam = [false false];
 	rateParam = {'k','Km'};
 	for jj = 1:length(rateParam)
-		testVal = v(ii).(rateParam{jj});
+		testVal = rxn(ii).(rateParam{jj});
 		if isempty(testVal)
 			continue;
 		elseif ~isreal(testVal(1)) % Is a free param, but part of a group with the same param, but multiplicative factor. The "imaginary" number is used to group. The real part is the factor.
@@ -282,7 +290,7 @@ for ii=1:length(v)
 			sign      = {[-1;-1;0*prodIndx'+1]};
 			bnd       = {Bndk2};
 			reqTens   = {'k2'};
-			if isempty(v(ii).enz)
+			if isempty(rxn(ii).enz)
 				paramDesc = {['k    : ' x.name{subIndx} ' -> ' x.name{prodIndx}];};
 			elseif length(prodIndx)==2
 				paramDesc = {['kc/Km: ' x.name{subIndx(2)} ' -> ' x.name{prodIndx(2)} '| ' x.name{subIndx(1)}]};
@@ -335,7 +343,7 @@ for ii=1:length(v)
 	% Insert values into tensors. Expand tensors are necessary
     for jj = 1:length(reqTens);
         if freeParam(jj)
-            [pFit,repInd,pInd] = getIndmkLabel(pFit,v(ii).(rateParam{jj}),bnd{jj},repInd,paramDesc{jj});
+            [pFit,repInd,pInd] = getIndmkLabel(pFit,rxn(ii).(rateParam{jj}),bnd{jj},repInd,paramDesc{jj});
             if (find(isnan(pFit.lim(:,1)),1,'first')+10)>size(pFit.lim,1)
                 pFit.desc = [pFit.desc;cell(100,1)]; 
                 pFit.lim  = [pFit.lim;nan(100,2)];
@@ -369,9 +377,9 @@ for ii = 1:size(xData,1)
             rmXData = ii;
 			break
 		end
-		indx_v(jj) = tmpSign*indx;
+		indx_rxn(jj) = tmpSign*indx;
 	end
-	xData{ii,2} = indx_v ;
+	xData{ii,2} = indx_rxn ;
 end
 xData(rmXData,:) = [];
 pFit.sim2dat = xData;
