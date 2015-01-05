@@ -65,8 +65,6 @@ xMod = {'AKT'     ,'Cyto',NaN;
         'p473mAKT','PM',  0;
         'p473AKT' ,'Cyto',0;};
 
-
-
 %% Relationship between simulation state and model state association
 
 xData = {'Exp Name',{'*Sim 1','*Sim 2'}};
