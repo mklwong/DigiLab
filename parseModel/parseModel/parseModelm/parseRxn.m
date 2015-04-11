@@ -11,19 +11,23 @@ prodVec = ones(size(prodIndx));
 subList = cell(1,2*length(subIndx));
 subList(1:2*length(subIndx)) = {', '};
 subList(1:2:2*length(subIndx)) = x.name(subIndx);
-subList(end) = [];
+if ~isempty(subList)
+    subList(end) = [];
+end
 
 prodList = cell(1,2*length(prodIndx));
 prodList(1:2*length(prodIndx)) = {', '};
 prodList(1:2:2*length(prodIndx)) = x.name(prodIndx);
-prodList(end) = [];
+if ~isempty(prodList)
+    prodList(end) = [];
+end
 
 %% Types
 	switch rxnType
 		case 'syn'
 			tensInd   = {1:length(prodIndx)};
 			tensVal   = {[prodIndx val(1)*prodVec]};
-			sign      = {proVec};
+			sign      = {prodVec};
 			bnd       = {Bnd.k0};
 			reqTens   = {'k0'};
 			paramDesc = {['k    : phi -> ' x.name{prodIndx}]};
@@ -61,6 +65,8 @@ prodList(end) = [];
                 else
                     paramDesc = {['k    : ' subList{:} ' -> ' prodList{:}]};
                 end
+            else
+                paramDesc = {['k    : ' subList{:} ' -> ' prodList{:}]};
 			end
 		case 'enzQSSA'
 				%Make new complex species
