@@ -162,10 +162,10 @@ storeGrp = [-1,-1];
 
 repInd  = []; %repeatedly used parameters (in multiple contexts)
 
-G.tens  = nan(100,4); G.sign  = nan(100,1); G.pInd  = nan(100,2); G.factor   = nan(100,1);
-k2.tens = nan(100,4); k2.sign = nan(100,1); k2.pInd = nan(100,2); k2.factor  = nan(100,1);
-k1.tens = nan(100,3); k1.sign = nan(100,1); k1.pInd = nan(100,2); k1.factor  = nan(100,1);
-k0.tens = nan(100,2); k0.sign = nan(100,1); k0.pInd = nan(100,2); k0.factor  = nan(100,1);
+G.tens  = nan(100,4); G.sign  = nan(100,1); G.pInd  = nan(100,1); G.factor   = nan(100,1);
+k2.tens = nan(100,4); k2.sign = nan(100,1); k2.pInd = nan(100,1); k2.factor  = nan(100,1);
+k1.tens = nan(100,3); k1.sign = nan(100,1); k1.pInd = nan(100,1); k1.factor  = nan(100,1);
+k0.tens = nan(100,2); k0.sign = nan(100,1); k0.pInd = nan(100,1); k0.factor  = nan(100,1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over list of species
@@ -174,7 +174,7 @@ k0.tens = nan(100,2); k0.sign = nan(100,1); k0.pInd = nan(100,2); k0.factor  = n
 x.tens    = nan(a,1);    % Initial concentration
 x.name    = cell(a,1);   % Species name
 x.comp    = ones(a,1);   % Compartment Index
-x.pInd    = nan(a,1);    % Vector showing the parameter index a free state will use
+x.pInd    = zeros(0,1);    % Vector showing the parameter index a free state will use
 
 for ii = 1:a
     % Save Name
@@ -204,10 +204,10 @@ for ii = 1:a
             if length(xMod{ii,3}) == 3       %% If there is custom set boundary
                 pFit.lim(curParamIndx,:) = xMod{ii,3}(2:3);
             else                             %% Else use default boundary
-                pFit.lim(curParamIndx,:) = BndConc;
+                pFit.lim(curParamIndx,:) = Bnd.Conc;
             end
             pFit.desc{curParamIndx}	= ['Conc - ' xMod{ii,1}];
-            x.pInd(ii) = curParamIndx; % store p index the variable x0 represents
+            x.pInd(ii,:) = curParamIndx; % store p index the variable x0 represents
         end
     end
 end
@@ -218,24 +218,24 @@ end
 for ii=1:length(rxn)
 	
 	%% Reaction classifier (based on number of substrates)
-    [subIndx,prodIndx,rxnType] = classifyReaction(rxn(ii),x);
+    [subIndx,prodIndx,enzIndx,rxnType] = classifyReaction(rxn(ii),x);
     
-	%% Determine if parameters are free or not
+	%% Determine if parameters are free or not and extract relevant parameter values
     % Test 'k'
-    testVal = rxn.k;
+    testVal = rxn(ii).k;
     [val(1),freeParam(1),factor(1)] = testPar(testVal);
 
     % Test 'Km'
-    testVal = rxn.Km;
+    testVal = rxn(ii).Km;
     [val(2),freeParam(2),factor(2)] = testPar(testVal);
 	
 	%% Set tensor targets and values based on reaction type
-    parseRxn(rxnType,prodIndx,subIndx,val,x)
-	
-	% Insert values into tensors. Expand tensors are necessary
+    [reqTens,tensInd,tensVal,sign,bnd,paramDesc,x] = parseRxn(rxnType,subIndx,prodIndx,enzIndx,val,x,Bnd);
+    
+	% Insert values into tensors. Expand tensors as necessary
     for jj = 1:length(reqTens);
         if freeParam(jj)
-            [pFit,repInd,pInd] = getIndmkLabel(pFit,rxn(ii).(rateParam{jj}),bnd{jj},repInd,paramDesc{jj});
+            [pFit,repInd,pInd] = getIndmkLabel(pFit,val(jj),bnd{jj},repInd,paramDesc{jj});
             if (find(isnan(pFit.lim(:,1)),1,'first')+10)>size(pFit.lim,1)
                 pFit.desc = [pFit.desc;cell(100,1)]; 
                 pFit.lim  = [pFit.lim;nan(100,2)];
@@ -244,6 +244,8 @@ for ii=1:length(rxn)
             pInd = [];
         end
 		eval([reqTens{jj} '= appendTens(' reqTens{jj} ',tensVal{jj},sign{jj},tensInd{jj},pInd,factor(jj));'])
+        
+        % Expand if necessary
         if eval(['(tall(' reqTens{jj} ')+10)>size(' reqTens{jj} '.tens,1)'])
             eval([reqTens{jj} '.tens = [' reqTens{jj} '.tens;nan(100,size(' reqTens{jj} ',2)];']) 
             eval([reqTens{jj} '.sign = [' reqTens{jj} '.sign;nan(100,1)];']) 
@@ -251,7 +253,6 @@ for ii=1:length(rxn)
         end
     end
 end
-G.pInd(:,2) = -G.pInd(:,2); % Make the G.pInd negative since they are all inserted as denominators.
 
 %% Determining how Model states interacts with experimental states
 rmXData = [];
@@ -291,49 +292,22 @@ if ~isempty(clampSpc)
 	for ii = clampSpc'
 		k0Indx = (k0.tens(:,1)==ii);
 		k0.tens(k0Indx,end) = 0;
-		k0.pInd(k0Indx,:) = NaN;
-		k0.sign(k0Indx,:) = NaN;
-		k0.factor(k0Indx,:) = NaN;
 		
 		k1Indx = (k1.tens(:,1)==ii);
 		k1.tens(k1Indx,end) = 0;
-		k1.pInd(k1Indx,:) = NaN;
-		k1.sign(k1Indx,:) = NaN;
-		k1.factor(k1Indx,:) = NaN;
 		
 		k2Indx = (k2.tens(:,1)==ii);
 		k2.tens(k2Indx,end) = 0;
-		k2.pInd(k2Indx,:) = NaN;
-		k2.sign(k2Indx,:) = NaN;
-		k2.factor(k2Indx,:) = NaN;
 
 		GIndx = (G.tens(:,1)==ii);
 		G.tens(GIndx,end) = 0;
-		G.pInd(GIndx,:) = NaN;
-		G.sign(GIndx,:) = NaN;
-		G.factor(GIndx,:) = NaN;
 	end
 end
 % remove NaN rows
-k0.tens(isnan(k0.tens(:,1)),:) = [];
-k0.pInd(isnan(k0.pInd(:,1)),:) = [];
-k0.sign(isnan(k0.sign(:,1)),:) = [];
-k0.factor(isnan(k0.factor(:,1)),:) = [];
-
-k1.tens(isnan(k1.tens(:,1)),:) = [];
-k1.pInd(isnan(k1.pInd(:,1)),:) = [];
-k1.sign(isnan(k1.sign(:,1)),:) = [];
-k1.factor(isnan(k1.factor(:,1)),:) = [];
-
-k2.tens(isnan(k2.tens(:,1)),:) = [];
-k2.pInd(isnan(k2.pInd(:,1)),:) = [];
-k2.sign(isnan(k2.sign(:,1)),:) = [];
-k2.factor(isnan(k2.factor(:,1)),:) = [];
-
-G.tens(isnan(G.tens(:,1)),:) = [];
-G.pInd(isnan(G.pInd(:,1)),:) = [];
-G.sign(isnan(G.sign(:,1)),:) = [];
-G.factor(isnan(G.factor(:,1)),:) = [];
+k0 = rmNans(k0);
+k1 = rmNans(k1);
+k2 = rmNans(k2);
+G = rmNans(G);
 	
 limIndx = isnan(pFit.lim(:,1));
 pFit.desc(limIndx,:) = [];
@@ -351,14 +325,28 @@ end
 %%%%%%%%%%%%%%%%%%%%%
 function tens = appendTens(tens,vals,signs,tensInd,pInd,fact)
 n = size(vals,2);
+tensLength = find(isnan(tens.tens(:,1)),1,'first')-1;
 try
-	tens.tens(tensInd,1:n) = vals;
+	tens.tens(tensLength+tensInd,1:n) = vals;
 catch
 	keyboard
 end
 if ~isempty(pInd)
-    tens.pInd(tensInd,:) = [tensInd' pInd*ones(length(tensInd),1)];
-    tens.sign(tensInd) = signs;
-    tens.factor(tensInd) = fact;
+    tens.pInd(tensLength+tensInd,:) = pInd*ones(length(tensInd),1);
+    tens.sign(tensLength+tensInd) = signs;
+    tens.factor(tensLength+tensInd) = fact;
 end
+end
+
+
+%%%%%%%%%%%%%%%%%%%%%
+function tensCat = rmNans(tensCat)
+    rmIndx = find(~isnan(tensCat.tens(:,1)),1,'last')+1;
+    if isempty(rmIndx)
+        rmIndx = 1;
+    end
+    tensCat.tens(rmIndx:end,:) = [];
+    tensCat.pInd(rmIndx:end,:) = [];
+    tensCat.sign(rmIndx:end,:) = [];
+    tensCat.factor(rmIndx:end,:) = [];
 end
