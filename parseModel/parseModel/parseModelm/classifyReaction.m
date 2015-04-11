@@ -1,4 +1,4 @@
-function [subIndx,prodIndx,rxnType] = classifyReaction(rxn,x)
+function [subIndx,prodIndx,enzIndx,rxnType] = classifyReaction(rxn,x)
 
 [~,~,subIndx]  = intersect(upper(rxn.sub) ,upper(x.name));
 [~,~,prodIndx] = intersect(upper(rxn.prod),upper(x.name));
@@ -7,8 +7,8 @@ function [subIndx,prodIndx,rxnType] = classifyReaction(rxn,x)
 nSub = length(subIndx);
 if nSub ==0
     if ~isempty(rxn.enz) 
-        subIndx  = [enzIndx subIndx];
-        prodIndx = [enzIndx prodIndx];
+        subIndx  = [subIndx enzIndx];
+        prodIndx = [prodIndx enzIndx];
         rxnType = 'uni';
     else
         rxnType = 'syn';
