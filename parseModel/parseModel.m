@@ -45,11 +45,11 @@ elseif strcmp(modType,'QSSA')
 		if isrow(p)
 			p = p';
 		end
-		mod.k0.tens(mod.k0.pInd(:,1),2) = (p(abs(mod.k0.pInd(:,2))).*mod.k0.sign.*mod.k0.factor).^sign(mod.k0.pInd(:,2));
-		mod.k1.tens(mod.k1.pInd(:,1),3) = (p(abs(mod.k1.pInd(:,2))).*mod.k1.sign.*mod.k1.factor).^sign(mod.k1.pInd(:,2));
-		mod.k2.tens(mod.k2.pInd(:,1),4) = (p(abs(mod.k2.pInd(:,2))).*mod.k2.sign.*mod.k2.factor).^sign(mod.k2.pInd(:,2));
-		mod.G.tens(mod.G.pInd(:,1),4)  = (p(abs(mod.G.pInd(:,2))).*mod.G.sign.*mod.G.factor).^sign(mod.G.pInd(:,2));
-		mod.x.tens(~isnan(mod.x.pInd)) = p(mod.x.pInd(~isnan(mod.x.pInd))).*mod.x.factor(~isnan(mod.x.pInd));
+		mod.k0.tens = addp(p,mod.k0,2);
+        mod.k1.tens = addp(p,mod.k1,3);
+        mod.k2.tens = addp(p,mod.k2,4);
+        mod.G.tens = addp(p,mod.G,4);
+		mod.x.tens = addp(p,mod.x,1);
 		%EXCEPTION: Checking for NaN tensor values (should all be done)
 		if [find(isnan(mod.k0.tens(:,end)))' find(isnan(mod.k1.tens(:,end)))' find(isnan(mod.k2.tens(:,end)))' find(isnan(mod.G.tens(:,end)))']
 			error('parseModel:UndefinedFreeTensorValues','Some tensor values are still NaN. Free parameters were undefined.')
@@ -57,4 +57,15 @@ elseif strcmp(modType,'QSSA')
 	end
 else
 	error('modelObjective:badModelInput','Invalid model passed. Check inputs')
+end
+
+end
+function tens = addp(p,tensCat,ind)
+    toUpdate = ~isnan(tensCat.pInd);
+    maxp = max(tensCat.pInd);
+    if maxp > length(p)
+        error('parseModel:insufficientParams','Insufficient parameters parsed. Please check parameter input')
+    end
+    tensCat.tens(toUpdate,ind) = p(tensCat.pInd(toUpdate)).*tensCat.tens(toUpdate,ind);
+    tens = tensCat.tens;
 end
