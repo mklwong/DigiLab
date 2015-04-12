@@ -8,7 +8,7 @@ switch type
         % Dissociation: k = [1 1 1 0]
         % Interconversion k = [1 0 1 0]
         % Degradation:  k = [1 1 0 0]
-        % Enzyme kinetic Syn (MM): k = [1 0 0 1]
+        % Enzyme kinetic Syn (MM): k = [1 1 1 1]
         dx_dt(1) = -k(1)*x(1) + k(1)*k(4)*x(1);
         dx_dt(2) =  k(1)*k(3)*x(1);
         dx_dt(3) =  k(1)*k(2)*k(3)*x(1);
