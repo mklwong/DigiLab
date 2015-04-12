@@ -66,6 +66,13 @@ function tens = addp(p,tensCat,ind)
     if maxp > length(p)
         error('parseModel:insufficientParams','Insufficient parameters parsed. Please check parameter input')
     end
-    tensCat.tens(toUpdate,ind) = p(tensCat.pInd(toUpdate)).*tensCat.tens(toUpdate,ind);
+    value   = p(tensCat.pInd(toUpdate)).*tensCat.tens(toUpdate,ind);
+    valSign = sign(value);
+    if isfield(tensCat,'pow')
+        pow = tensCat.pow(toUpdate);
+    else
+        pow = 1;
+    end
+    tensCat.tens(toUpdate,ind) = valSign.*(abs(value).^pow);
     tens = tensCat.tens;
 end

@@ -1,4 +1,4 @@
-function [reqTens,tensInd,tensVal,sign,bnd,paramDesc,x] = parseRxn(rxnType,subIndx,prodIndx,enzIndx,val,x,Bnd)
+function [reqTens,tensInd,tensVal,pow,bnd,paramDesc,x] = parseRxn(rxnType,subIndx,prodIndx,enzIndx,val,x,Bnd)
 
 % parseRxnImp
 %   This reaction parser uses the dQSSA but calculates the complex
@@ -27,7 +27,7 @@ end
 		case 'syn'
 			tensInd   = {1:length(prodIndx)};
 			tensVal   = {[prodIndx val(1)*prodVec]};
-			sign      = {prodVec};
+			pow      = {prodVec};
 			bnd       = {Bnd.k0};
 			reqTens   = {'k0'};
 			paramDesc = {['k    : phi -> ' x.name{prodIndx}]};
@@ -35,7 +35,7 @@ end
 			tensInd   = {(1:length(prodIndx)+1)};
 			tensVal   = {[subIndx         subIndx        -val(1)*ones(size(subIndx));
 				          prodIndx     subIndx'*prodVec    val(1)*prodVec]};
-			sign      = {[-1;prodVec]};
+			pow      = {[1;prodVec]};
 			bnd       = {Bnd.k1};
 			reqTens   = {'k1'};
 			if isempty(prodIndx)
@@ -50,7 +50,7 @@ end
 			tensVal   = {[[subIndx(1) subIndx(1) subIndx(2)     -val(1);
 				           subIndx(2) subIndx(1) subIndx(2)     -val(1)];
 						  [prodIndx     prodVec*subIndx     prodVec*val(1)]]};
-			sign      = {[-1;-1;prodVec]};
+			pow      = {[1;1;prodVec]};
 			bnd       = {Bnd.k2};
 			reqTens   = {'k2'};
 			if length(prodIndx)==1
@@ -79,13 +79,13 @@ end
 							 (1:6)};
 				tensVal   = {[subIndx  comIndx -val(1);
 					          prodIndx' ones(size(prodIndx',1),1)*[comIndx  val(1)]];
-							 [subIndx subIndx enzIndx  1/val(2);
-							  subIndx enzIndx subIndx  1/val(2);
-							  enzIndx subIndx enzIndx  1/val(2);
-							  enzIndx enzIndx subIndx  1/val(2);
-							  comIndx subIndx enzIndx -1/val(2);
-							  comIndx enzIndx subIndx -1/val(2)]};
-				sign      = {[-1 1],[1 1 1 1 -1 -1]};
+							 [subIndx subIndx enzIndx  val(2);
+							  subIndx enzIndx subIndx  val(2);
+							  enzIndx subIndx enzIndx  val(2);
+							  enzIndx enzIndx subIndx  val(2);
+							  comIndx subIndx enzIndx -val(2);
+							  comIndx enzIndx subIndx -val(2)]};
+				pow      = {[1 1],[-1 -1 -1 -1 -1 -1]};
 				bnd       = {Bnd.k1,Bnd.Km};
 				reqTens   = {'k1','G'};
 				paramDesc = {['kc   : ' subList{:} ' -> ' prodList{:} ' [' x.name{enzIndx} ']'];

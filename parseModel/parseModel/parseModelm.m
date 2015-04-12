@@ -162,10 +162,10 @@ storeGrp = [-1,-1];
 
 repInd  = []; %repeatedly used parameters (in multiple contexts)
 
-G.tens  = nan(100,4); G.sign  = nan(100,1); G.pInd  = nan(100,1); G.factor   = nan(100,1);
-k2.tens = nan(100,4); k2.sign = nan(100,1); k2.pInd = nan(100,1); k2.factor  = nan(100,1);
-k1.tens = nan(100,3); k1.sign = nan(100,1); k1.pInd = nan(100,1); k1.factor  = nan(100,1);
-k0.tens = nan(100,2); k0.sign = nan(100,1); k0.pInd = nan(100,1); k0.factor  = nan(100,1);
+G.tens  = nan(100,4); G.pow  = nan(100,1); G.pInd  = nan(100,1); G.factor   = nan(100,1);
+k2.tens = nan(100,4); k2.pow = nan(100,1); k2.pInd = nan(100,1); k2.factor  = nan(100,1);
+k1.tens = nan(100,3); k1.pow = nan(100,1); k1.pInd = nan(100,1); k1.factor  = nan(100,1);
+k0.tens = nan(100,2); k0.pow = nan(100,1); k0.pInd = nan(100,1); k0.factor  = nan(100,1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over list of species
@@ -230,7 +230,7 @@ for ii=1:length(rxn)
     [val(2),freeParam(2),factor(2)] = testPar(testVal);
 	
 	%% Set tensor targets and values based on reaction type
-    [reqTens,tensInd,tensVal,sign,bnd,paramDesc,x] = parseRxn(rxnType,subIndx,prodIndx,enzIndx,val,x,Bnd);
+    [reqTens,tensInd,tensVal,pow,bnd,paramDesc,x] = parseRxn(rxnType,subIndx,prodIndx,enzIndx,val,x,Bnd);
     
 	% Insert values into tensors. Expand tensors as necessary
     for jj = 1:length(reqTens);
@@ -243,7 +243,7 @@ for ii=1:length(rxn)
         else
             pInd = [];
         end
-		eval([reqTens{jj} '= appendTens(' reqTens{jj} ',tensVal{jj},sign{jj},tensInd{jj},pInd,factor(jj));'])
+		eval([reqTens{jj} '= appendTens(' reqTens{jj} ',tensVal{jj},pow{jj},tensInd{jj},pInd,factor(jj));'])
         
         % Expand if necessary
         if eval(['(tall(' reqTens{jj} ')+10)>size(' reqTens{jj} '.tens,1)'])
@@ -323,7 +323,7 @@ out.G  = G;
 end
 
 %%%%%%%%%%%%%%%%%%%%%
-function tens = appendTens(tens,vals,signs,tensInd,pInd,fact)
+function tens = appendTens(tens,vals,pow,tensInd,pInd,fact)
 n = size(vals,2);
 tensLength = find(isnan(tens.tens(:,1)),1,'first')-1;
 try
@@ -333,7 +333,7 @@ catch
 end
 if ~isempty(pInd)
     tens.pInd(tensLength+tensInd,:) = pInd*ones(length(tensInd),1);
-    tens.sign(tensLength+tensInd) = signs;
+    tens.pow(tensLength+tensInd) = pow;
     tens.factor(tensLength+tensInd) = fact;
 end
 end
@@ -347,6 +347,6 @@ function tensCat = rmNans(tensCat)
     end
     tensCat.tens(rmIndx:end,:) = [];
     tensCat.pInd(rmIndx:end,:) = [];
-    tensCat.sign(rmIndx:end,:) = [];
+    tensCat.pow(rmIndx:end,:) = [];
     tensCat.factor(rmIndx:end,:) = [];
 end
