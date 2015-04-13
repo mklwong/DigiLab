@@ -75,9 +75,9 @@ end
 
 % Create initial concentration vector
 if isempty(x0)
-	x0 = model.x.tens;
-elseif size(x0,1) ~= size(model.x.tens)
-	x0(length(model.x.tens)) = 0;
+	x0 = model.conc.tens;
+elseif size(x0,1) ~= size(model.conc.tens)
+	x0(length(model.conc.tens)) = 0;
 end
 
 
@@ -212,7 +212,6 @@ end
 
 YComp  = Y;
 Y = compDis(model,Y);      %dissociate complex
-Y = Y(:,model.x.comp>=0);  %remove complex states from Y
 
 warnstate('on') %Switch warnings back to warnings
 end
