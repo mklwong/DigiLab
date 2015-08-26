@@ -23,13 +23,13 @@ if ParMode
 end
 
 %% Kernel
-if exist(data,'file')
-	load(data);  % Load objective
-elseif exist(['objectiveData\' data],'file')
-	load(['objectiveData\' data])
-else
-	error('Objective file not found')
-end
+% if exist(data,'file')
+% 	load(data);  % Load objective
+% elseif exist(['objectiveData\' data],'file')
+% 	load(['objectiveData\' data])
+% else
+% 	error('Objective file not found')
+% end
 
 % Get model name
 if ischar(model)
@@ -109,14 +109,14 @@ fprintf('%6.2f  ',T)
 fprintf('\n')
 
 % Parse Model
-model = parseModel(model);
+model = parseModel(model,p);
 if ~exist('objFun')
 	objFun = @(p) modelObjective(model,p,U);
 end
 if exist('opts','var')
-	opts = MCMCOptimset(opts,'Pmin',Pmin,'ParMode',ParMode,'PtNo',ptNo);
+	opts = MCMCOptimset(opts,'Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo);
 else
-	opts = MCMCOptimset('Pmin',Pmin,'ParMode',ParMode,'PtNo',ptNo);
+	opts = MCMCOptimset('Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo);
 end
 %%=======================================================================%%
 %%=======================START RUN=======================================%%
@@ -132,8 +132,8 @@ while ii ~= length(T)+1
     %=======     Run MCMC       =======%
     fprintf('\n**** MCMC Start ****\n')
     fprintf('Tempering at T = %6.2f\n',T(ii))
-    opts = MCMCOptimset(opts,'T',T(ii)','Prir',prir);
-    [pts,logP,status] = MCMC(objFun,model.pFit.lim,opts);
+    opts = MCMCOptimset(opts,'T',T(ii)','Prior',prir);
+    [pts,logP,status] = MCMC(objFun,[],model.pFit.lim,opts);
     
     fprintf('Temperature %6.2f done after %7.1f seconds.\n',T(ii),toc(t1))
     
