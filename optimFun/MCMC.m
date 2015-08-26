@@ -200,7 +200,7 @@ while status == 1
                 fprintf('%4.2e\n',logP)
 			end
 		end
-        if ~isempty(opts.prior)
+        if ~isempty(opts.prior.pts)
 			% Select new point from prior based on goodness of fit of the
 			% prior
             rngPt = rand(1);
