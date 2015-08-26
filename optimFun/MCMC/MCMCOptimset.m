@@ -117,7 +117,7 @@ for ii = 1:length(varargin)
 			case 'on'
 			case 'off'
 			case 'text'
-			otherwise
+            otherwise
 				warning('MCMCoptimset:unknowninput',['Input options ' num2str(ii) ' is non-existent. Check spelling.'])
 		end
 	end
