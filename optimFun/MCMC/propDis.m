@@ -20,11 +20,16 @@ n = 7; %scaling factor to turn range of randn to 1.
 bndRng = (bnd(:,2)-bnd(:,1));
 bndRng(isinf(bndRng)) = 1;
 
+%Determine scale
+logTest = log(bnd(:,2))-log(bnd(:,1));
+logScale = logTest>1&imag(logTest)==0;
+
 %%
 % Generate random variable. Undirected
 while sum(reRoll)
 	prop = randn(size(pt0))/n.*opts.step.*bndRng;
-	pt1(reRoll) = pt0(reRoll)+prop(reRoll);
+	pt1(reRoll&~logScale) = pt0(reRoll&~logScale)+prop(reRoll&~logScale);
+	pt1(reRoll&logScale) = pt0(reRoll&logScale).*exp(prop(reRoll&logScale));
 	reRoll = pt1<bnd(:,1)|pt1>bnd(:,2);
 end
 
@@ -47,7 +52,16 @@ end
 %%
 % Calculate biasing by truncating the cumulative distribution function.
 % This is for the hastings ratio
-pdfBias = biasCalc(pt0,pt1,bnd,n,opts.step);
+
+%Create mixed log and lin scale points
+pt0_M = pt0;
+pt0_M(logScale) = log(pt0(logScale));
+pt1_M = pt1;
+pt1_M(logScale) = log(pt1(logScale));
+bnd_M = bnd;
+bnd_M(logScale,:) = log(bnd(logScale,:));
+
+pdfBias = biasCalc(pt0_M,pt1_M,bnd_M,n,opts.step);
 
 end
 
@@ -59,7 +73,7 @@ function pdfBias = biasCalc(pt0,pt1,bnd,n,step)
 	if ~isempty(bnd)
 		xy = biasLin(bnd(:,1)-pt0,bnd(:,2)-pt0,n./step);
 		yx = biasLin(bnd(:,1)-pt1,bnd(:,2)-pt1,n./step);
-
+		
 		pdfBias = prod(xy)/prod(yx);
 	else
 		pdfBias = 1;   % Unbounded MCMC run is by definition not biased in it's proposal distribution.

@@ -263,14 +263,35 @@ while status == 1
 
     %% Intermediate plotting of points (full display, only at single core mode)
     if ~opts.parMode && strcmpi(opts.disp,'full')
-        if  isempty(pltHndl)
+		% Test Scale
+		logTest = log(bnd(:,2))-log(bnd(:,1));
+		logScale = logTest>1&imag(logTest)==0;
+		if ~logScale(1)
+			fordDirX = pt(1)+opts.basis(1)*opts.step(1);
+			RevDirX = pt(1)-opts.basis(1)*opts.step(1);
+		else
+			fordDirX = pt(1)*opts.basis(1)*opts.step(1);
+			RevDirX = pt(1)/(opts.basis(1)*opts.step(1));
+		end
+		
+		if ~logScale(2)
+			fordDirY = pt(2)+opts.basis(2)*opts.step(2);
+			RevDirY = pt(2)-opts.basis(2)*opts.step(2);
+		else
+			fordDirY = pt(2)*opts.basis(2)*opts.step(2);
+			RevDirY = pt(2)/(opts.basis(2)*opts.step(2));
+		end
+		
+        if isempty(pltHndl)
             subplot(2,2,[1 3])
+			
+
 			% Draw the boundaries
 			curBasis = [opts.basis null(opts.basis')];%%%
 			if isfield(opts,'pt0')
 				pltHndl = plot(pt(1),pt(2),'x',...
 				pt(1),pt(2),'o',...
-				[pt(1)-opts.basis(1)*opts.step(1) pt(1)+opts.basis(1)*opts.step(1)],[pt(2)-opts.basis(2)*opts.step(1) pt(2)+opts.basis(2)*opts.step(1)]);%%%
+				[fordDirX RevDirX],[fordDirY RevDirY]);%%%
 			else
 				pltHndl = plot(pt(1),pt(2),'x',...
 				pt(1),pt(2),'o',...
@@ -280,9 +301,16 @@ while status == 1
 				[bnd(1,2) bnd(1,1)],[bnd(2,2) bnd(2,2)],...
 				[bnd(1,1) bnd(1,1)],[bnd(2,2) bnd(2,1)]);
 			end
+			if logScale(1)
+				set(gca,'XScale','log')
+			end
+			if logScale(2)
+				set(gca,'YScale','log')
+			end
+			% Other diagnostic plots
             subplot(2,2,2)
             pltHndl2 = semilogy(1,logP/opts.T,[0 1],-log10([opts.Pmin opts.Pmin]),':');
-			subplot(2,2,4)
+ 			subplot(2,2,4)
 			pltHndl3 = plot(1,sqrt(sum(opts.step.^2)));
         else
 			subplot(2,2,[1 3])
@@ -290,13 +318,13 @@ while status == 1
 			ylabel('Param 2')
 			title(['Pts saved = ' num2str(pt_uniQ_n,'%d')])
             set(pltHndl(1),'XData',[get(pltHndl(1),'XData') pt(1)],'YData',[get(pltHndl(1),'YData') pt(2)])
-            n   = get(pltHndl2(1),'XData');
+            n   = get(pltHndl3(1),'XData');
             set(pltHndl(2),'XData',pt(1),'YData',pt(2))
 			curBasis = [opts.basis null(opts.basis')];
-			set(pltHndl(3),'XData',[pt(1)-opts.basis(1)*opts.step(1) pt(1)+opts.basis(1)*opts.step(1)],'YData',[pt(2)-opts.basis(2)*opts.step(1) pt(2)+opts.basis(2)*opts.step(1)])
+			set(pltHndl(3),'XData',[fordDirX RevDirX],'YData',[fordDirY RevDirY])
 			set(pltHndl2(1),'XData',[n n(end)+1],'YData',[get(pltHndl2(1),'YData') logP/opts.T])
 			set(pltHndl2(2),'XData',[0 n(end)+1])
-			set(pltHndl3,'XData',[n n(end)+1],'YData',[get(pltHndl3,'YData') sqrt(sum(opts.step.^2))])		
+ 			set(pltHndl3,'XData',[n n(end)+1],'YData',[get(pltHndl3,'YData') sqrt(sum(opts.step.^2))])		
 			drawnow
 		end
 	end
@@ -439,6 +467,9 @@ end
 if ~isrow(pt1)
 	pt1 = pt1';
 end
+if ~isrow(pt0)
+	pt0 = pt0';
+end
 logP1 = objfun(pt1);      % Obtain likelihood of proposed step
 
 % Metropolis Algorithm
@@ -465,5 +496,9 @@ else
 	pt = pt0;
 	logP = logP0;
 end
-delPt = pt1-pt0;
+try
+	delPt = pt1-pt0;
+catch
+	keyboard
+end
 end
