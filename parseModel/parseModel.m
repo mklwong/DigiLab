@@ -50,9 +50,9 @@ elseif strcmp(modType,'QSSA')
 	% Parsing models
 	if ischar(model)
 		if strcmp(model((end-1):end),'.m')
-			mod = parseModelm(model,rxnRules,expComp);
+			mod = parseModelm(model,rxnRules,expComp,p);
 		elseif exist([model '.m'],'file')
-			mod = parseModelm(model,rxnRules,expComp);
+			mod = parseModelm(model,rxnRules,expComp,p);
 		elseif strcmp(model((end-3):end),'.xml')
 			mod = parseModelSBML(model);
 		elseif exist([model '.xml'],'file')

@@ -80,14 +80,13 @@ elseif size(x0,1) ~= size(model.conc.tens)
 	x0(length(model.conc.tens)) = 0;
 end
 
-
 inpConst = zeros(length(x0),1);
 inpFun = @(t)zeros(length(x0),1);
 %Input values: make all into either function handles or vectors
 % This component looks at the experiment-simulation name pair, then
 % compares the experiment name with the name given in the 
 if iscell(tmpInp) %state name-val pair
-	protList = model.x.name;
+	protList = model.conc.name;
 	inpFunInd = [];
 	inpConstInd = [];
 	for ii = 1:size(tmpInp,1)
@@ -168,6 +167,7 @@ if ~exist('options','var')
 end
 warnstate('error')
 
+%% Solving
 % Ramping
 if ramp && basal
 	rampSigma = @(t) x0*normFac*normpdf(t,0,0.2);

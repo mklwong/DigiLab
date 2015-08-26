@@ -23,9 +23,9 @@ strfind(curDir,'\');
 rmIndx = max(strfind(curDir,'\'));
 curDir(rmIndx+1:end) = [];
 if nargin == 2
-    curDir = [curDir 'template-clean.m'];
+    curDir = [curDir 'modelTemplate-clean.m'];
 else
-    curDir = [curDir 'template.m'];
+    curDir = [curDir 'modelTemplate.m'];
 end
 copyfile(curDir,[name '.m'])
 

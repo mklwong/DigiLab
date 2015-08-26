@@ -110,7 +110,9 @@ fprintf('\n')
 
 % Parse Model
 model = parseModel(model);
-objFun = @(p) modelObjective(model,p,U);
+if ~exist('objFun')
+	objFun = @(p) modelObjective(model,p,U);
+end
 if exist('opts','var')
 	opts = MCMCOptimset(opts,'Pmin',Pmin,'ParMode',ParMode,'PtNo',ptNo);
 else

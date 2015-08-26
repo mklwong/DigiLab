@@ -37,7 +37,7 @@ for ii = 1:length(U)
     %% Find and match simulated and experimental states   
     objProt = U(ii).states;      % Obtain protein names from objective
     modOut = model.pFit.sim2dat; % Get labels to match to experimental states
-	modProt = model.x.name;      % Get protein names in simulation
+	modProt = model.conc.name;      % Get protein names in simulation
     [matches,simIndx,expIndx] = intersect(upper(modOut(:,1)),upper(objProt));
 	
 	%expIndx is the row index of the experimental data that is fed in U

@@ -1,4 +1,4 @@
-function [pt1,pdfBias,logScl] = propDis(pt0,bnd,opts)
+function [pt1,pdfBias] = propDis(pt0,bnd,opts)
 
 % pdfBias is q(x,y)/q(y,x)
 
@@ -14,23 +14,40 @@ end
 %initialise stuff
 pt1 = 0*pt0;
 
-% Determine log scale
-logScl = ((log10(bnd(:,2))-log10(bnd(:,1)))>1) &(bnd(:,1)>=0);
-
 reRoll = true(size(pt0));
 n = 7; %scaling factor to turn range of randn to 1.
 
-% Generate random variable
+bndRng = (bnd(:,2)-bnd(:,1));
+bndRng(isinf(bndRng)) = 1;
+
+%%
+% Generate random variable. Undirected
 while sum(reRoll)
-	prop = randn(size(pt0))/n.*opts.step;
-	pt1(~logScl&reRoll) = pt0(~logScl&reRoll)+prop(~logScl&reRoll);
-	pt1(logScl&reRoll)  = pt0(logScl&reRoll).*10.^(prop(logScl&reRoll));
+	prop = randn(size(pt0))/n.*opts.step.*bndRng;
+	pt1(reRoll) = pt0(reRoll)+prop(reRoll);
 	reRoll = pt1<bnd(:,1)|pt1>bnd(:,2);
 end
 
+% Generate random variable. Directed
+% nPt = length(pt0);
+% curBasis = opts.basis;
+% try
+% 	basis = [curBasis null(curBasis')];
+% catch
+% 	keyboard
+% end
+% pow = opts.basisSkew;
+% alpha = 0.75;
+% 
+% while sum(reRoll)
+% 	pt1(reRoll) = pt0(reRoll) + propFunc(randn(sum(reRoll),1),skew)/n.*opts.step;
+% 	reRoll = pt1<bnd(:,1)|pt1>bnd(:,2);
+% end
+
+%%
 % Calculate biasing by truncating the cumulative distribution function.
 % This is for the hastings ratio
-pdfBias = biasCalc(pt0,pt1,bnd,n,logScl,opts.step);
+pdfBias = biasCalc(pt0,pt1,bnd,n,opts.step);
 
 end
 
@@ -38,25 +55,15 @@ end
 %%%%%%%%%%%%%%%%%%% End Function %%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function pdfBias = biasCalc(pt0,pt1,bnd,n,logScl,step)
-xyBias = 0*pt0;
-yxBias = 0*pt0;
+function pdfBias = biasCalc(pt0,pt1,bnd,n,step)
+	if ~isempty(bnd)
+		xy = biasLin(bnd(:,1)-pt0,bnd(:,2)-pt0,n./step);
+		yx = biasLin(bnd(:,1)-pt1,bnd(:,2)-pt1,n./step);
 
-xyLin = biasLin(bnd(:,1)-pt0,bnd(:,2)-pt0,n./step);
-yxLin = biasLin(bnd(:,1)-pt1,bnd(:,2)-pt1,n./step);
-
-try
-	xyLog = biasLin(log10(bnd(logScl,1)./pt0(logScl)),log10(bnd(logScl,2)./pt0(logScl)),n./step(logScl));
-	yxLog = biasLin(log10(bnd(logScl,1)./pt1(logScl)),log10(bnd(logScl,2)./pt1(logScl)),n./step(logScl));
-catch
-	keyboard
-end
-xyBias(~logScl) = xyLin(~logScl);
-xyBias(logScl) = xyLog;
-yxBias(~logScl) = yxLin(~logScl); 
-yxBias(logScl) = yxLog;
-
-pdfBias = prod(xyBias)/prod(yxBias);
+		pdfBias = prod(xy)/prod(yx);
+	else
+		pdfBias = 1;   % Unbounded MCMC run is by definition not biased in it's proposal distribution.
+	end
 end
 
 %%%%%%%%%%%%
@@ -65,4 +72,18 @@ function rat = biasLin(x1,x2,n)
 
 rat = 1./((erf(x2/sqrt(2).*n)+1)/2-(erf(x1/sqrt(2).*n)+1)/2);
     %Cumulative function to ub take away cumulative function to lb
+end
+
+function pt = propFunc(x,skew)
+n = 1;
+skewCoeff = 1;
+
+skew = (skew/skewCoeff).^n;
+
+pt = 2*normpdf(x,0,1).*normcdf(3.1*skew./(1+abs(skew)).*x,0,1);
+
+%the skew = (skew/skewCoeff).^n makes the skew scale like a hill function.
+%the larger the skew, the more biased in that direction, up to the point
+%where only 10% of the sampled points will be in the non-skewed direction.
+
 end

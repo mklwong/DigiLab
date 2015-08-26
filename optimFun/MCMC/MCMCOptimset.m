@@ -25,11 +25,11 @@ function varargout = MCMCOptimset(varargin)
 
 Names = ['PtNo     ' %number of points to store  | defaults at 10,000
 		 'T        ' %value greater than zero    | defaults to 1
-         'Prir     ' %struct                     | defaults to empty
+         'prior    ' %struct                     | defaults to empty
          'Pmin     ' %value less than one        | defaults to 0
 		 'AcptRto  ' %Acceptance ratio before    | defaults to 0.5
 		             %changing step size
-         'Display  ' %iter, text or off          | defaults to text
+         'display  ' %iter, text or off          | defaults to text
 		 'DispInt  ' %display interval: number of| defaults to 10
 		             %times the program prints   |
 				 	 %a completion percentage    | 
@@ -55,10 +55,9 @@ Names = ['PtNo     ' %number of points to store  | defaults at 10,000
 %== create default opts struc ==%
 %===============================%
 
-opts.ptNo = 10000;
-opts.T    = 1;
-opts.prir.pts  = [];
-opts.prir.logP = [];
+opts.ptNo      = 10000;
+opts.T         = 1;
+opts.prior     = [];
 opts.Pmin      = 0;
 opts.rjtRto    = 0.5;
 opts.disp      = 'off';
@@ -89,7 +88,7 @@ for ii = 1:length(varargin)
 			case lower(deblank(Names(2,:)))    %T
 				opts.T = varargin{ii+1};
 			case lower(deblank(Names(3,:)))    %prir
-				opts.prir = varargin{ii+1};
+				opts.prior = varargin{ii+1};
 			case lower(deblank(Names(4,:)))    %Pmin
 				opts.Pmin = varargin{ii+1};
 			case lower(deblank(Names(5,:)))    %actpRto

@@ -1,8 +1,8 @@
 function Y = compDis(model,Y)
 
 % Y2 = compDis(Y,G)
-x = model.x.tens;
-G = model.G.tens;
+x = model.conc.tens;
+G = model.param(1).tens;
 
 if ~isempty(G)
 	% Remove the terms which correlate with change in enzyme/substrate
@@ -21,4 +21,8 @@ if ~isempty(G)
 	M = eye(size(x,1));
 	M((G(:,2)-1)*max(G(:,1))+G(:,1))=1;
 	Y = Y*M;
+	
+	% Remove complexes
+	rmIndx = unique(G(:,1));
+	Y(:,rmIndx) = [];
 end
