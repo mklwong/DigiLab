@@ -204,7 +204,7 @@ while status == 1
 			% Select new point from prior based on goodness of fit of the
 			% prior
             rngPt = rand(1);
-			newPtInd = ceil(interp1(priorP,1:length(priorP),rngPt));
+			newPtInd = ceil(interp1([0;priorP],0:length(priorP),rngPt));
             ptTest = priorPts(newPtInd,:);
 			logPNew  = objfun(ptTest);
 		elseif isfield(opts,'pt0')
