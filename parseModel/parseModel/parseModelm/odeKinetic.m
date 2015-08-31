@@ -50,15 +50,16 @@ case 'rxnrules'
 
 [~,~,subIndx]  = intersect(upper(rxn.sub) ,upper(x.name));
 [~,~,prodIndx] = intersect(upper(rxn.prod),upper(x.name));
-prodIndx = prodIndx';
 [~,~,enzIndx]  = intersect(upper(rxn.enz) ,upper(x.name));
 
-% Correction for legacy scripts
-if iscolumn(subIndx)
-    subIndx = subIndx';
-    prodIndx = prodIndx';
-    enzIndx = enzIndx';
+%Change for legacy matlab versions
+if isrow(subIndx)
+	subIndx = subIndx';
 end
+if isrow(prodIndx)
+	prodIndx = prodIndx';
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Classifier%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -105,6 +106,7 @@ end
 
 prodComp = x.comp(prodIndx);
 subComp  = x.comp(subIndx);
+subVec  = ones(size(subIndx));
 prodVec = ones(size(prodIndx));
 
 switch rxnType
@@ -153,9 +155,8 @@ switch rxnType
 		end
 		
 		% Maths
-		tensVal   = {[[subIndx(1) subIndx(1) subIndx(2) -k*overlap/x.comp(subIndx(1));
-					   subIndx(2) subIndx(1) subIndx(2) -k*overlap/x.comp(subIndx(2))];
-					  [prodIndx    prodVec*subIndx       k*overlap*(1./x.comp(prodIndx))]]};
+		tensVal   = {[[subIndx  subVec*subIndx'  -k*overlap./x.comp(subIndx)];
+					  [prodIndx prodVec*subIndx'  k*overlap*(1./x.comp(prodIndx))]]};
 	case 'enzQSSA'
 		if expComp
 			%Make new complex species
