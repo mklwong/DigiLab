@@ -66,7 +66,7 @@ end
 nSub = length(subIndx);
 if nSub ==0
     if ~isempty(enzIndx) 
-        subIndx  = [enzIndx subIndx];
+        subIndx  = [enzIndx;subIndx];
         prodIndx = [enzIndx;prodIndx];
         rxnType = 'uni';
     else
@@ -75,7 +75,7 @@ if nSub ==0
 elseif nSub == 1
     if ~isempty(enzIndx) 
         if isempty(rxn.Km)
-            subIndx   = [enzIndx subIndx];
+            subIndx   = [enzIndx;subIndx];
             prodIndx  = [enzIndx;prodIndx];
             rxnType = 'bi';
         elseif ~isempty(rxn.Km)
@@ -155,8 +155,12 @@ switch rxnType
 		end
 		
 		% Maths
+		try
 		tensVal   = {[[subIndx  subVec*subIndx'  -k*overlap./x.comp(subIndx)];
 					  [prodIndx prodVec*subIndx'  k*overlap*(1./x.comp(prodIndx))]]};
+		catch
+			keyboard
+		end
 	case 'enzQSSA'
 		if expComp
 			%Make new complex species

@@ -15,6 +15,10 @@ Names = ['expComp ';
 expComp = true;
 rxnRules = @odeKinetic;
 	 
+if ~exist('p')
+	p = [];
+end
+
 %Parse optional parameters (if any)
 for ii = 1:length(varargin)
 	if ischar(varargin{ii}) %only enter loop if varargin{ii} is a parameter
