@@ -7,7 +7,7 @@ x(x<0) = 0; %sometimes the system goes to less than zero. When it wants to do th
 M = zeros(size(k1));
 L = M;
 
-MTmp = sparse(G(:,1),G(:,3),G(:,4).*x(G(:,2)));
+MTmp = sparse(G(:,1),G(:,3),x(G(:,2))./G(:,4));
 [a,b] = size(MTmp);
 M(1:a,1:b) = MTmp;
 

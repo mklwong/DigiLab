@@ -1,7 +1,15 @@
-function out = parseModelm(model,varargin)
+function out = parseModelm(model,rxnRules,expComp,p)
 
 %   out = parseModelm(model,debug)
 %
+
+% parseRxn mostly complete. Now completing inserting the parseRxn generated
+% tensor into the full tensor. Also need to consider how pInd works in the
+% case of rate parameter tensors. Try and unify it to how it works in the x
+% case.
+%
+% Biggest concerns seems to be the dynamic variable name on the left hand
+% side of assignments.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%% Program Internal Description %%%%%%%%%%%%%%%%%%%%
@@ -9,12 +17,13 @@ function out = parseModelm(model,varargin)
 % Each parameter has six potential formats:
 %	1) [val]        : Known parameter
 %	2) [NaN]        : Unknown parameter, default range used
-%   3) [NaN grp]       : Unknown parameter that is grouped. Default range used.
+%	3) [NaN lb ub]  : Unknown parameter, custom range
+
+%   4) [NaN grp]       : Unknown parameter that is grouped. Default range used.
 %                     Multiplicative factor is assumed to be one.
-%	4) [NaN lb ub]  : Unknown parameter, custom range
 %   5) [NaN grp lb ub] : Unknown parameter with other parameters with the same
 %                     value, custom range.
-%   6) [NaN grp factor]: Unknown parameter that is a multiplicative factor of
+%   6) [NaN grp+factor*i]: Unknown parameter that is a multiplicative factor of
 %                     another parameter. Parameter of this format is the
 %                     dependent.
 % grp is a positive integer. All parameters with grp that is the same
@@ -60,7 +69,7 @@ function out = parseModelm(model,varargin)
 % %%%%%%%%%%%%%Output Groupings%%%%%%%%%%%%
 % The output of this function are in the form of structs.
 %
-% The base struct will contain a struct with 6 fields, all of which are
+% The params struct will contain a struct with 6 fields, all of which are
 % themselves structs:
 %	k3  : (bimolecular type tensor)
 %	k2  : (unimolecular type tensors)
@@ -95,28 +104,6 @@ function out = parseModelm(model,varargin)
 %	- desc   : description of each parameter
 %	- lim    : limits of each parameter
 %	- sim2dat: Linking simulation species with experimental species
-
-%%%%%%%%%%%%%%%%%%%
-%% Function options
-%%%%%%%%%%%%%%%%%%%
-% Default options
-expComp = 1;
-
-Names = 'expComp ';
-
-%Parse optional parameters (if any)
-for ii = 1:length(varargin)
-	if ischar(varargin{ii}) %only enter loop if varargin{ii} is a parameter
-		switch lower(deblank(varargin{ii}))
-			case lower(deblank(Names(1,:)))
-				expComp = varargin{ii+1};
-			case []
-				error('Expecting Option String in input');
-			otherwise
-				error('Non-existent option selected. Check spelling.')
-		end
-	end
-end
 	 
 %%%%%%%%%%%%%%%%%%%%%
 %% Import model file
@@ -128,6 +115,7 @@ rxn(end).label = [];
     rxn(end).enz = [];
 	rxn(end).Km = [];
     rxn(end).k  = [];  
+	rxn(end).A  = [];
     
 v = rxn; %Legacy code. For backward compatibility.
 
@@ -136,80 +124,93 @@ if isa(model,'function_handle')
 end
 
 out.name = model;
-xMod = [];
-run(model); %loads xMod and v, xData and boundaries from model
 
-rxn(1) = [];
+run(model); 
+%loads the following 
+%	- spcComp: compartment info for model.
+%	- modSpc:  species infor for model
+%	- dataSpc: how data readout and model species are related
+%	- Bnd:	   default boundaries for parameter types
+%	- rxn:	   list of reactions of the model
+
+rxn(1) = []; % remove 
 % Legacy code
 if size(v) > 1
     error('Please change all v in your model file into rxn. v no longer recognised as reaction network variable')
 end
 
-% Convenience functions
-notFixed = @(val) (isnan(val) || val < 0);
-	%determine if a parameter is defined as fixed or not. This is
-	%essentially determining if it's passed as NaN or negative, both of
-	%which indicate free variables.
-tall = @(struct) min([find(isnan(struct.tens(:,1)),1,'first')-1 length(struct.tens(:,1))]); 
-	%NaN is used to indicate empty slots in a tensor. This is so numbers 
-	%filled can be easily determined by counting non-NaN elements.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Initialise Output Structs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Initalise parameter vector
 pFit.desc = cell(100,1); pFit.lim  = nan(100,2);
-curParamIndx = 0;
-storeGrp = [-1,-1];
+curParInd = 0;
+paramGrp = [-1,-1];
 
-repInd  = []; %repeatedly used parameters (in multiple contexts)
+% Initialise chemical species
+[a,~]     = size(modSpc);
+conc.tens    = nan(a,1);    % Initial concentration
+conc.name    = cell(a,1);   % Species name
+conc.comp    = ones(a,1);   % Compartment Index
+conc.pInd    = nan(a,1);    % Vector showing the parameter index a free state will use
 
-G.tens  = nan(100,4); G.pow  = nan(100,1); G.pInd  = nan(100,1); G.factor   = nan(100,1);
-k2.tens = nan(100,4); k2.pow = nan(100,1); k2.pInd = nan(100,1); k2.factor  = nan(100,1);
-k1.tens = nan(100,3); k1.pow = nan(100,1); k1.pInd = nan(100,1); k1.factor  = nan(100,1);
-k0.tens = nan(100,2); k0.pow = nan(100,1); k0.pInd = nan(100,1); k0.factor  = nan(100,1);
+% Initialise parameters
+param = rxnRules('ini');
+
+for ii = 1:length(param) % Create pInd for all params.
+	param(ii).pInd = nan;
+end
+param = expandTens(param);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Cycle over compartments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+for ii = 1:size(spcComp,1)
+	% Save Name
+	name = spcComp{ii,1};
+	
+	% Process parameter
+    [val,freeParam,grp] = testPar(spcComp{ii,2});
+	
+	parDesc = ['Conc : ' modSpc{ii,1}];
+	if freeParam
+		if length(modSpc{ii,3})==3
+			custBnd = modSpc{ii,3}(2:3);
+		else
+			custBnd = [];
+		end
+		[pFit,conc,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,conc,custBnd,Bnd.Conc,paramGrp,grp);
+		spcComp{ii,2} = p(putParInd)*val; % Save either parameter value of parameter multiplicative factor
+	end
+	
+end		
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over list of species
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[a,~]     = size(xMod);
-x.tens    = nan(a,1);    % Initial concentration
-x.name    = cell(a,1);   % Species name
-x.comp    = ones(a,1);   % Compartment Index
-x.pInd    = zeros(0,1);    % Vector showing the parameter index a free state will use
-
 for ii = 1:a
     % Save Name
-	x.name{ii} = xMod{ii,1};
+	conc.name{ii} = modSpc{ii,1};
     
     % Get compartment size for each species
-	[~,comptIndx] = intersect(upper(xComp(:,1)),upper(xMod{ii,2}));
-	x.comp(ii) = xComp{comptIndx,2};
+	[~,comptIndx] = intersect(upper(spcComp(:,1)),upper(modSpc{ii,2}));
+	conc.comp(ii) = spcComp{comptIndx,2};
 
     % Process parameter
-    [val,freeParam,grp] = testPar(xMod{ii,3});
+    [val,freeParam,grp] = testPar(modSpc{ii,3});
     
-	x.tens(ii) = val; % Save either parameter value of parameter multiplicative factor
-    
-    if freeParam
-        if ~all(grp~=storeGrp)            %%existing group of free parameters
-            x.pInd(ii) = storeGrp(grp==storeGrp,2);
-        else                             %% ungrouped or new group of free parameter
-            curParamIndx = curParamIndx + 1; % New parameter required
-
-            %Make new group
-            if grp ~= 0                  
-                storeGrp(end+1,:) = [grp curParamIndx];
-            end
-
-            % Set parameter boundary
-            if length(xMod{ii,3}) == 3       %% If there is custom set boundary
-                pFit.lim(curParamIndx,:) = xMod{ii,3}(2:3);
-            else                             %% Else use default boundary
-                pFit.lim(curParamIndx,:) = Bnd.Conc;
-            end
-            pFit.desc{curParamIndx}	= ['Conc - ' xMod{ii,1}];
-            x.pInd(ii,:) = curParamIndx; % store p index the variable x0 represents
-        end
-    end
+	conc.tens(ii) = val; % Save either parameter value of parameter multiplicative factor
+    parDesc = ['Conc : ' modSpc{ii,1}];
+	if freeParam
+		if length(modSpc{ii,3})==3
+			custBnd = modSpc{ii,3}(2:3);
+		else
+			custBnd = [];
+		end
+		[pFit,conc,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,conc,custBnd,Bnd.Conc,paramGrp,grp);
+		conc.pInd(ii) = putParInd; % store p index the variable x0 represents
+	end
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over list of Reactions
@@ -217,136 +218,148 @@ end
 
 for ii=1:length(rxn)
 	
-	%% Reaction classifier (based on number of substrates)
-    [subIndx,prodIndx,enzIndx,rxnType] = classifyReaction(rxn(ii),x);
-    
-	%% Determine if parameters are free or not and extract relevant parameter values
-    % Test 'k'
-    testVal = rxn(ii).k;
-    [val(1),freeParam(1),factor(1)] = testPar(testVal);
-
-    % Test 'Km'
-    testVal = rxn(ii).Km;
-    [val(2),freeParam(2),factor(2)] = testPar(testVal);
+	%% Determine if parameters are free or not
+    % Test parameter for 'k'
+    [rxn(ii).k,freeParam(1),grp(1),bnd{1}] = testPar(rxn(ii).k);
 	
-	%% Set tensor targets and values based on reaction type
-    [reqTens,tensInd,tensVal,pow,bnd,paramDesc,x] = parseRxn(rxnType,subIndx,prodIndx,enzIndx,val,x,Bnd);
-    
-	% Insert values into tensors. Expand tensors as necessary
+    % Test parameter for 'Km'
+    [rxn(ii).Km,freeParam(2),grp(2),bnd{2}] = testPar(rxn(ii).Km);
+	
+	%% Turn reactions into maths using reaction rules
+    [reqTens,tensVal,parDesc,conc] = rxnRules('rxnRules',rxn(ii),conc,expComp,ii);
+	
+	tensNames = {param.name};
+	
+	% Loop through new additions 
     for jj = 1:length(reqTens);
-        if freeParam(jj)
-            [pFit,repInd,pInd] = getIndmkLabel(pFit,val(jj),bnd{jj},repInd,paramDesc{jj});
-            if (find(isnan(pFit.lim(:,1)),1,'first')+10)>size(pFit.lim,1)
-                pFit.desc = [pFit.desc;cell(100,1)]; 
-                pFit.lim  = [pFit.lim;nan(100,2)];
-            end
-        else
-            pInd = [];
-        end
-		eval([reqTens{jj} '= appendTens(' reqTens{jj} ',tensVal{jj},pow{jj},tensInd{jj},pInd,factor(jj));'])
-        
-        % Expand if necessary
-        if eval(['(tall(' reqTens{jj} ')+10)>size(' reqTens{jj} '.tens,1)'])
-            eval([reqTens{jj} '.tens = [' reqTens{jj} '.tens;nan(100,size(' reqTens{jj} ',2)];']) 
-            eval([reqTens{jj} '.sign = [' reqTens{jj} '.sign;nan(100,1)];']) 
-            eval([reqTens{jj} '.pInd = [' reqTens{jj} '.pInd;nan(100,1)];']) 
-        end
+		
+		[~,reqIndx] = intersect(upper(tensNames),upper(reqTens{jj}));
+		
+		% Expand tensor as required
+		tensLength  = find(isnan(param(reqIndx).tens(:,1)),1,'first'); %Length of current tensor
+		appndLength = size(tensVal{jj},1)-1;                      %Length to be appended
+		appndIndx   = tensLength:(tensLength+appndLength);        %Indicies in current tensor new values to be appended to
+		if appndLength + tensLength + 10 > length(param(reqIndx).pInd)
+			param(reqIndx) = expand(param(reqIndx));
+		end
+		
+		% Insert parameter indicies for free parameters
+		if freeParam(jj)
+			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bnd{jj},Bnd.(reqTens{jj}),paramGrp,grp(jj));
+			param(reqIndx).pInd(appndIndx) = putParInd;               %Append parameter index
+		end
+
+		try
+			param(reqIndx).tens(appndIndx,:) = tensVal{jj};               %Append tensor
+		catch msg
+			printErr(msg)
+			keyboard
+		end
     end
 end
 
-%% Determining how Model states interacts with experimental states
-rmXData = [];
-for ii = 1:size(xData,1)
-	for jj = 1:length(xData{ii,2})
-		if strcmp(xData{ii,2}{jj}(1),'*')
-			tmpSign = -1;
-			xData{ii,2}{jj}(1) = [];
+% remove NaN rows from generated tensors
+for ii = 1:length(param)
+	paramRmIndx = isnan(param(ii).tens(:,1));
+	param(ii) = contractTens(param(ii),paramRmIndx);
+end
+pFitRmIndx = isnan(pFit.lim(:,1));
+pFit  = contractTens(pFit,pFitRmIndx);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Determine data and model relation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+rmXData = [];  % List of dataSpcs to remove due to not having all species in the model.
+
+% Loop through experimental species
+for ii = 1:size(dataSpc,1)
+	% Loop through attached model state
+	dataSpcTmp = zeros(size(dataSpc{ii,2}));
+	for jj = 1:length(dataSpc{ii,2})
+		
+		% Determine if complex of model species needs to be included.
+		% model species with start in them will have enzyme-substrate
+		% complex included (flat -1).
+		if strcmp(dataSpc{ii,2}{jj}(1),'*')
+			incComp = -1;
+			dataSpc{ii,2}{jj}(1) = [];
 		else
-			tmpSign = 1;
+			incComp = 1;
 		end
-		[~,~,indx]  = intersect(upper(xData{ii,2}{jj}),upper(x.name));
+		
+		% Get species name index
+		[~,~,indx]  = intersect(upper(dataSpc{ii,2}{jj}),upper(conc.name));
+		
+		% If required model species not in the simulation. Print warning and then exclude
         if isempty(indx)
-			storeError(model,[],[],[],['The state ' xData{ii,2}{jj} ' required as an experimental equivalent state not found. This experimental state will be excluded from curve fitting'])
+			storeError(model,[],[],[],['The state ' dataSpc{ii,2}{jj} ' required as an experimental equivalent state not found. This experimental state will be excluded from curve fitting'])
             rmXData = ii;
 			break
 		end
-		indx_rxn(jj) = tmpSign*indx;
-	end
-	xData{ii,2} = indx_rxn ;
-end
-xData(rmXData,:) = [];
-pFit.sim2dat = xData;
-
-%% Final processing
-% Find clamped species and remove them from tensors so they won't change
-% themselves due to internal events, but will induce change
-%
-% Also remove clamp rows by turning their tens values into 0 to make them
-% have no influence. These rows can't be removed because the pInd to  
-% tensInd reference pairs to link the parameter vector to tensor matrix
-% have already been fixed at this point. It will be too difficult to
-% recalculate. So it's easier to just leave them there. This will also
-% retain the model connection in the model file for clarity.
-clampSpc = find(isinf(abs(x.comp)));
-if ~isempty(clampSpc)
-	for ii = clampSpc'
-		k0Indx = (k0.tens(:,1)==ii);
-		k0.tens(k0Indx,end) = 0;
 		
-		k1Indx = (k1.tens(:,1)==ii);
-		k1.tens(k1Indx,end) = 0;
-		
-		k2Indx = (k2.tens(:,1)==ii);
-		k2.tens(k2Indx,end) = 0;
-
-		GIndx = (G.tens(:,1)==ii);
-		G.tens(GIndx,end) = 0;
+		% Store index of model species including flag of whether to include
+		% enzyme-substrate complex or not.
+		dataSpcTmp(jj) = incComp*indx;
 	end
+	dataSpc{ii,2} = dataSpcTmp;
 end
-% remove NaN rows
-k0 = rmNans(k0);
-k1 = rmNans(k1);
-k2 = rmNans(k2);
-G = rmNans(G);
-	
-limIndx = isnan(pFit.lim(:,1));
-pFit.desc(limIndx,:) = [];
-pFit.lim(limIndx,:) = [];
+dataSpc(rmXData,:) = [];
+pFit.sim2dat = dataSpc;
 
 %% Compile output
-out.x = x;
+out.conc = conc;
 out.pFit = pFit;
-out.k0 = k0;
-out.k1 = k1;
-out.k2 = k2;
-out.G  = G;
+out.param = param;
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%End Main Function%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%
+function param = expandTens(param)
+	paramFields = fieldnames(param);
+	for ii = 1:length(param)
+		for jj = 1:length(paramFields)
+			if ~ismember(paramFields{jj},{'name'}) % Fields to not expand on contract
+				arrayWidth = size(param(ii).(paramFields{jj}),2);
+				param(ii).(paramFields{jj}) = [param(ii).(paramFields{jj}) ; nan(200,arrayWidth)];
+			end
+		end
+	end
+end
+
+function param = contractTens(param,ind)
+	paramFields = fieldnames(param);
+	for jj = 1:length(paramFields)
+		if ~ismember(paramFields{jj},{'name'}) % Fields to not expand on contract
+			tmpTens = param.(paramFields{jj});
+			tmpTens(ind,:) = [];
+			param.(paramFields{jj}) = tmpTens;
+		end
+	end
 end
 
 %%%%%%%%%%%%%%%%%%%%%
-function tens = appendTens(tens,vals,pow,tensInd,pInd,fact)
-n = size(vals,2);
-tensLength = find(isnan(tens.tens(:,1)),1,'first')-1;
-try
-	tens.tens(tensLength+tensInd,1:n) = vals;
-catch
-	keyboard
-end
-if ~isempty(pInd)
-    tens.pInd(tensLength+tensInd,:) = pInd*ones(length(tensInd),1);
-    tens.pow(tensLength+tensInd) = pow;
-    tens.factor(tensLength+tensInd) = fact;
-end
-end
+function [pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,param,custBnd,defBnd,paramGrp,grp)
 
+if ~all(grp~=paramGrp(:,1))            %%existing group of free parameters
+	putParInd = paramGrp(grp==paramGrp(:,1),2);
+else                             %% ungrouped or new group of free parameter
+	curParInd = curParInd + 1; % New parameter required
 
-%%%%%%%%%%%%%%%%%%%%%
-function tensCat = rmNans(tensCat)
-    rmIndx = find(~isnan(tensCat.tens(:,1)),1,'last')+1;
-    if isempty(rmIndx)
-        rmIndx = 1;
-    end
-    tensCat.tens(rmIndx:end,:) = [];
-    tensCat.pInd(rmIndx:end,:) = [];
-    tensCat.pow(rmIndx:end,:) = [];
-    tensCat.factor(rmIndx:end,:) = [];
+	%Make new group
+	if grp ~= 0                  
+		paramGrp(end+1,:) = [grp curParInd];
+	end
+
+	% Set parameter boundary
+	if ~isempty(custBnd)       %% If there is custom set boundary
+		pFit.lim(curParInd,:) = custBnd;
+	else                             %% Else use default boundary
+		pFit.lim(curParInd,:) = defBnd;
+	end
+	pFit.desc{curParInd}	= parDesc;
+	putParInd = curParInd;
+end
+	
 end

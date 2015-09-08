@@ -7,13 +7,13 @@ elseif nargin == 2
 end
 
 % Get x0 to know the required tensor size
-x0 = model.x.tens;
+x0 = model.conc.tens;
 
 % Generate tensors using sparse function
-k0 = full(sparse(model.k0.tens(:,1),model.k0.tens(:,1)*0+1,model.k0.tens(:,2)));
-k1 = full(sparse(model.k1.tens(:,1),model.k1.tens(:,2),model.k1.tens(:,3)));
-k2 = model.k2.tens;
-G  = model.G.tens;
+k0 = full(sparse(model.param(4).tens(:,1),ones(size(model.param(4).tens(:,1))),model.param(4).tens(:,2)));
+k1 = full(sparse(model.param(3).tens(:,1),model.param(3).tens(:,2),model.param(3).tens(:,3)));
+k2 = model.param(2).tens;
+G  = model.param(1).tens;
 
 % Make up matrices to correct dimension
 if length(k0)~= length(x0)

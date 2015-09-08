@@ -1,4 +1,4 @@
-function [pts,logP,status] = MCMC(objfun,bnd,opts)
+function [pts,logP,status] = MCMC(objfun,pt0,bnd,opts)
 
 % [pstrir,P] = MCMC(objfun,bnd,opts)
 %
@@ -13,7 +13,7 @@ function [pts,logP,status] = MCMC(objfun,bnd,opts)
 %
 % Opts is a struct that contains optional parameters
 % T    = annealing temperature
-% prir = the results prior from a previous saved MCMCSeriel run
+% prior = the results prior from a previous saved MCMCSeriel run
 % Pmin = Minimum tempered probability required for acceptance into
 %        posterior
 %
@@ -21,21 +21,19 @@ function [pts,logP,status] = MCMC(objfun,bnd,opts)
 % program will randomly sample from the prior every so often.
 
 %% Kernel
-%=== Create or access program options ===%
-if nargin == 2
+%=== Create (if no passed) or access program options ===%
+if nargin == 3
     opts = MCMCOptimset;
-elseif nargin == 3
+elseif nargin == 4
 	if ~isstruct(opts)
 		error('MCMC:InvalidInput','Invalid options given for MCMC')
 	end
 end
 
 %== Integrity Check ==%
-if sum(double(bnd(:,1)>bnd(:,2)))>0
-	error('MCMC:LowerBoundLargerThanUpperBound','Lower bound is set to be larger than the upper bound')
-end
+bnd = sort(bnd,2);
 
-%== Process displays ==%
+%== Initialise displays ==%
 if ~strcmpi(opts.disp,'off')
     if strcmpi(opts.disp,'full') && ~opts.parMode
         clf
@@ -44,30 +42,49 @@ if ~strcmpi(opts.disp,'off')
 	fprintf('Start time is %2.0f:%2.0f:%2.2f (%2.0f-%2.0f-%4.0f)\n',startTime(4),startTime(5),startTime(6),startTime(3),startTime(2),startTime(1))
 end
 
+%== Process parallel computing ==%
 if opts.parMode
-    parComp('open');
+    parRes = parComp('open');
+	if parRes == -1
+		opts.parMode = false;
+	end
 end
 
-%% Process prior based on boundary
-if ~isempty(opts.prir)
-	prir = opts.prir;
-	[prir_n,~] = size(prir.pts);
+%== Add initial point into optimisation settings ==%
+if ~isempty(pt0)
+	if isrow(pt0)
+		opts.pt0 = pt0;
+	else
+		opts.pt0 = pt0';
+	end
+	if sum(double(opts.pt0<bnd(:,1)' | opts.pt0>bnd(:,2)'))
+		error('MCMC:InitialPointOutOfBound','Initial point is outside the required boundary.')
+	end
+end
+
+%== Make sure all points in prior within boundary ==%
+if ~isempty(opts.prior)
+	prior = opts.prior;
+	[prir_n,~] = size(prior.pts);
 	% Remove prior points that are outside the boundary
 	if prir_n>0
-		rmIndx = ~logical(prod(double(prir.pts>(ones(prir_n,1)*bnd(:,1)') & prir.pts<(ones(prir_n,1)*bnd(:,2)')),2));
-		prir.logP(rmIndx) = [];
-		prir.pts(rmIndx,:) = [];
+		rmIndx = ~logical(prod(double(prior.pts>(ones(prir_n,1)*bnd(:,1)') & prior.pts<(ones(prir_n,1)*bnd(:,2)')),2));
+		prior.logP(rmIndx) = [];
+		prior.pts(rmIndx,:) = [];
 	end
-	opts.prir = prir;
+	opts.prior = prior;
 end
+
+opts.obj = objfun;
+opts.bnd = bnd;
 
 %% MCMC Kernel split into multi core parallel and single core mode
 if opts.parMode
 	spmd
-		[ptRaw,logPRaw,status] = MCMCRun(objfun,bnd,opts);
+		[ptRaw,logPRaw,status] = MCMCRun(opts);
 	end
 else
-    [ptRaw,logPRaw,status] = MCMCRun(objfun,bnd,opts);
+    [ptRaw,logPRaw,status] = MCMCRun(opts);
 end
 
 %% Run Completion
@@ -86,7 +103,7 @@ end
 %%%%%%%%%%%%%%%%%%% MCMC Function %%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [ptLocal,logPLocal,status] = MCMCRun(objfun,bnd,opts)
+function [ptLocal,logPLocal,status] = MCMCRun(opts)
 % Parallel mode protocols
 % Packet tags are:
 %    1: Sending and receiving points and data
@@ -101,7 +118,7 @@ t1 = tic; %t1 is the MCMC begin time (in global terms)
 t2 = tic; %t2 is the time to last completion checkpoint 
 %this is also the counter used for run termination.
 
-%Existence test for parallel computing parameters
+% Existence test for parallel computing parameters
 if ~exist('numlabs','builtin')
     numlab = 1;
     labindx = 1;
@@ -110,11 +127,33 @@ else
     labindx = labindex;
 end
 
-%Check that boundary is correctly supplied
-if size(bnd,1) ~= 2 && size(bnd,2) ~= 2
-	error('MCMC:BoundaryInvalid','Boundary not supplied correctly. Must be [lb,ub] where lb and ub are 1xN vectors where N is the number of free parameters')
+objfun = opts.obj;
+bnd    = opts.bnd;
+
+% Process prior
+if ~isempty(opts.prior)
+	% Extract priors
+	priorPts  = opts.prior.pts;
+	priorLogP = opts.prior.logP;
+	% Remove duplicate probabilities
+	dupIndx = find(priorLogP(1:end-1)-priorLogP(2:end)==0);
+	priorLogP(dupIndx)  = [];
+	priorPts(dupIndx,:) = [];
+	% Turn objective score into PDF and then CDF for prior
+	[priorP,I] = sort(exp(-priorLogP));
+	priorPts = priorPts(I,:);
+	priorLogP = priorLogP(I);
+	priorP = cumsum(priorP);
+	% Remove low probability points
+	rmPts = priorP<(1e-4*max(priorP));	
+	priorP(rmPts) = [];
+	priorLogP(rmPts) = [];
+	priorPts(rmPts,:) = [];
+	% Normalise CDF to 1
+	priorP = priorP/max(priorP);
 end
 
+%% Initialisation
 % Reinitialise the random number stream after spmd generated stream (which
 % is always the same
 mystream = RandStream.create('mrg32k3a','seed',sum(clock*100),'NumStreams',numlab,'StreamIndices',labindx); 
@@ -126,23 +165,23 @@ else
     ptNoMax = opts.passNo;
 end
 
+if ~isfield(opts,'pt0')
+	varNo = size(opts.bnd,1);
+else
+	varNo = length(opts.pt0);
+end
 % Initialise variables for storing points
-ptLocal = zeros(ptNoMax,size(bnd,1));    
+ptLocal = zeros(ptNoMax,varNo);    
 logPLocal  = nan(ptNoMax,1);    
-
 
 % Initialise counters and markers
 stallWarn = 0;  %number of stall cycles triggered (program stops when this hits 10)
 pt_n   = 0;
-stp_n  = 0;
-logP      = Inf;  %Set this to enter point selection and acceptance loop
-prir_n = size(opts.prir.pts,1);
+logP   = Inf;  %Set this to enter point selection and acceptance loop
+
 pltHndl    = []; % for initialising the program into the first plot of the run
 adaptFun = opts.adaptFun;
-opts.step = ones(size(bnd(:,1)))*opts.stepi;
-opts    = adaptFun('initial',bnd(:,1),[],opts);
-dumPt = (bnd(:,1)+min([bnd(:,2),bnd(:,1)*1e2],[],2))/2;
-[~,~,logScl] = opts.propDis(dumPt',bnd,opts);
+opts    = adaptFun('initial',varNo,[],opts);
 nprogress = 1;
 acptCnt = int8(rand(1,20)>opts.rjtRto);
 pt_uniQ_n = 0;
@@ -153,46 +192,48 @@ status = 1;
 while status == 1
 	
     %% New active point selection
-    if mod(stp_n,opts.resample)==0 || ~exist('pt','var')
+    if mod(pt_n,opts.resample)==0 || ~exist('pt','var')
 		if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
             fprintf('New starting point...\n')
             if exist('pt','var')
                 fprintf('Existing point:  ')
-                fprintf('%4.2e, ',pt(1:end-1))
-                fprintf('%4.2e\n',pt(end))
+                fprintf('%4.2e\n',logP)
 			end
 		end
-        if prir_n > 1
-            rngPt = ceil(rand(1)*prir_n);
-            ptTest = opts.prir.pts(rngPt,:);
-            logPNew  = opts.prir.logP(rngPt);
-		elseif prir_n == 1
+        if ~isempty(opts.prior.pts)
+			% Select new point from prior based on goodness of fit of the
+			% prior
+            rngPt = rand(1);
+			newPtInd = ceil(interp1([0;priorP],0:length(priorP),rngPt));
+            ptTest = priorPts(newPtInd,:);
+			logPNew  = objfun(ptTest);
+		elseif isfield(opts,'pt0')
 			% If only a single prior point is given, do not jump around the
 			% parameter space by reseeding. Also do not put boundaries on
 			% the fitting.
-			ptTest = opts.prir.pts;
-			logPNew  = opts.prir.logP;
+			ptTest = opts.pt0;
+			logPNew  = objfun(ptTest);
 			opts.resample = Inf;
 			% Remove boundaries of the run, because with only one seed
 			% point, the run is assumed to be exploratory so should be
 			% unbounded.
-			bnd(:,1) = 0;
-			bnd(:,2) = Inf;
+			if isempty(bnd)
+				bnd = ones(varNo,2);
+				bnd(:,1) = -Inf;
+				bnd(:,2) = Inf;
+			end
 		else
 			if sum(bnd(:,1)==0 | isinf(bnd(:,2)))
 				error('mcmc:unboundNoPrior','Cannot be run with no boundary when no prior is given')
 			end
-            ptTest = 10.^(rand(size(bnd,1),1).*(log10(bnd(:,2))-log10(bnd(:,1)))+log10(bnd(:,1)));
-            pt2 = rand(size(bnd,1),1).*(bnd(:,2)-bnd(:,1))+bnd(:,1);
-            ptTest(~logScl) = pt2(~logScl);
+            ptTest = rand(size(bnd,1),1).*(bnd(:,2)-bnd(:,1))+bnd(:,1);
             logPNew  = objfun(ptTest);
             opts.resample = Inf;
         end % New candidate point
 		
         if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
             fprintf('Candidate point: ')
-            fprintf('%4.2e, ',ptTest(1:end-1))
-            fprintf('%4.2e\n',ptTest(end))
+            fprintf('%4.2e \n',logPNew)
         end % Active visualisation: initial new point   
 		
         % Metropolis acceptance criteria for new point
@@ -205,12 +246,14 @@ while status == 1
             opts.step = ones(size(bnd(:,1)))*opts.stepi;
             if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
                 fprintf('chosen... (%7.1fs)\n',toc(t1))
+				pt_n = pt_n + 1;
             end % Active visualisation: new point chosen
         else
             if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text'))  && labindx == 1
                 fprintf('rejected... (%7.1fs)\n',toc(t1))
             end % Active visualisation: old point retained
-        end
+		end
+		
     end
 
     %% MCMC evolution of active point
@@ -220,37 +263,68 @@ while status == 1
 
     %% Intermediate plotting of points (full display, only at single core mode)
     if ~opts.parMode && strcmpi(opts.disp,'full')
-        if  isempty(pltHndl)
-            subplot(3,1,1)
+		% Test Scale
+		logTest = log(bnd(:,2))-log(bnd(:,1));
+		logScale = logTest>1&imag(logTest)==0;
+		if ~logScale(1)
+			fordDirX = pt(1)+opts.basis(1)*opts.step(1);
+			RevDirX = pt(1)-opts.basis(1)*opts.step(1);
+		else
+			fordDirX = pt(1)*opts.basis(1)*opts.step(1);
+			RevDirX = pt(1)/(opts.basis(1)*opts.step(1));
+		end
+		
+		if ~logScale(2)
+			fordDirY = pt(2)+opts.basis(2)*opts.step(2);
+			RevDirY = pt(2)-opts.basis(2)*opts.step(2);
+		else
+			fordDirY = pt(2)*opts.basis(2)*opts.step(2);
+			RevDirY = pt(2)/(opts.basis(2)*opts.step(2));
+		end
+		
+        if isempty(pltHndl)
+            subplot(2,2,[1 3])
+			
+
 			% Draw the boundaries
-            pltHndl = plot(pt(1),pt(2),'x',...
-            pt(1),pt(2),'o',...
-            [bnd(1,1) bnd(1,2)],[bnd(2,1) bnd(2,1)],...
-            [bnd(1,2) bnd(1,2)],[bnd(2,1) bnd(2,2)],...
-            [bnd(1,2) bnd(1,1)],[bnd(2,2) bnd(2,2)],...
-            [bnd(1,1) bnd(1,1)],[bnd(2,2) bnd(2,1)]);
-            if logScl(1)
-                set(gca,'XScale','log')
-            end
-            if logScl(2)
-                set(gca,'YScale','log')
-            end
-            subplot(3,1,2)
+			curBasis = [opts.basis null(opts.basis')];%%%
+			if isfield(opts,'pt0')
+				pltHndl = plot(pt(1),pt(2),'x',...
+				pt(1),pt(2),'o',...
+				[fordDirX RevDirX],[fordDirY RevDirY]);%%%
+			else
+				pltHndl = plot(pt(1),pt(2),'x',...
+				pt(1),pt(2),'o',...
+				[pt(1) pt(1)+opts.basis(1)*opts.step(1)],[pt(2) pt(2)+opts.basis(2)*opts.step(1)],...%%%%
+				[bnd(1,1) bnd(1,2)],[bnd(2,1) bnd(2,1)],...
+				[bnd(1,2) bnd(1,2)],[bnd(2,1) bnd(2,2)],...
+				[bnd(1,2) bnd(1,1)],[bnd(2,2) bnd(2,2)],...
+				[bnd(1,1) bnd(1,1)],[bnd(2,2) bnd(2,1)]);
+			end
+			if logScale(1)
+				set(gca,'XScale','log')
+			end
+			if logScale(2)
+				set(gca,'YScale','log')
+			end
+			% Other diagnostic plots
+            subplot(2,2,2)
             pltHndl2 = semilogy(1,logP/opts.T,[0 1],-log10([opts.Pmin opts.Pmin]),':');
-			subplot(3,1,3)
+ 			subplot(2,2,4)
 			pltHndl3 = plot(1,sqrt(sum(opts.step.^2)));
         else
-			subplot(3,1,1)
+			subplot(2,2,[1 3])
 			xlabel('Param 1')
 			ylabel('Param 2')
 			title(['Pts saved = ' num2str(pt_uniQ_n,'%d')])
             set(pltHndl(1),'XData',[get(pltHndl(1),'XData') pt(1)],'YData',[get(pltHndl(1),'YData') pt(2)])
-            n   = get(pltHndl2(1),'XData');
+            n   = get(pltHndl3(1),'XData');
             set(pltHndl(2),'XData',pt(1),'YData',pt(2))
-			
+			curBasis = [opts.basis null(opts.basis')];
+			set(pltHndl(3),'XData',[fordDirX RevDirX],'YData',[fordDirY RevDirY])
 			set(pltHndl2(1),'XData',[n n(end)+1],'YData',[get(pltHndl2(1),'YData') logP/opts.T])
 			set(pltHndl2(2),'XData',[0 n(end)+1])
-			set(pltHndl3,'XData',[n n(end)+1],'YData',[get(pltHndl3,'YData') sqrt(sum(opts.step.^2))])
+ 			set(pltHndl3,'XData',[n n(end)+1],'YData',[get(pltHndl3,'YData') sqrt(sum(opts.step.^2))])		
 			drawnow
 		end
 	end
@@ -260,9 +334,9 @@ while status == 1
     if logP/opts.T <= -log(opts.Pmin)
         if testRes
             pt_uniQ_n = pt_uniQ_n + 1;
-            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx==1
-                disp(pt_uniQ_n+1)
-            end
+%             if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx==1
+%                 disp(pt_uniQ_n+1)
+%             end
         end
         pt_n = pt_n + 1;
         logPLocal(pt_n) = logP;
@@ -376,7 +450,7 @@ end
 %%%%%%%% Sub function starts below %%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [pt,logP,ptTest,pt1,opts] = MCMCKernel(objfun,pt0,logP0,bnd,opts)
+function [pt,logP,ptTest,delPt,opts] = MCMCKernel(objfun,pt0,logP0,bnd,opts)
 
 % MCMCKernel generates and tests the new point point using the hasting
 % ratio for MCMC. Point proposal is conducted
@@ -390,6 +464,12 @@ if sum(pt1 < bnd(:,1)) || sum(pt1 > bnd(:,2))
 end
 
 % Try next point
+if ~isrow(pt1)
+	pt1 = pt1';
+end
+if ~isrow(pt0)
+	pt0 = pt0';
+end
 logP1 = objfun(pt1);      % Obtain likelihood of proposed step
 
 % Metropolis Algorithm
@@ -402,6 +482,13 @@ thres = rand(1);   % Randomise threshold
 
 ptTest = thres < test;
 
+%ABC Rejection when less than threshold
+
+absthres = 1;
+if logP1 < absthres
+	ptTest = true;
+end
+
 if ptTest
 	pt = pt1;
 	logP = logP1;
@@ -409,5 +496,9 @@ else
 	pt = pt0;
 	logP = logP0;
 end
-
+try
+	delPt = pt1-pt0;
+catch
+	keyboard
+end
 end

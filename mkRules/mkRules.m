@@ -1,4 +1,4 @@
-function mkModel(name,clean)
+function mkRules(name,clean)
 %
 % mkModel(name,clean)
 %	Creates a new model for kinetic modelling from the model file template
@@ -8,7 +8,7 @@ function mkModel(name,clean)
 %   guide.
 
 if exist([name '.m'],'file')
-	rePlc = input('Model already exists. Replace (y/n)? ','s');
+	rePlc = input('Rule File already exists. Replace (y/n)? ','s');
     if strcmpi(rePlc,'y')
         rePlc = input('No backup will be made. Are you sure (y/n)? ','s');
     end
@@ -23,9 +23,9 @@ strfind(curDir,'\');
 rmIndx = max(strfind(curDir,'\'));
 curDir(rmIndx+1:end) = [];
 if nargin == 2
-    curDir = [curDir 'modelTemplate-clean.m'];
+    curDir = [curDir 'ruleTemplate-clean.m'];
 else
-    curDir = [curDir 'modelTemplate.m'];
+    curDir = [curDir 'ruleTemplate.m'];
 end
 copyfile(curDir,[name '.m'])
 

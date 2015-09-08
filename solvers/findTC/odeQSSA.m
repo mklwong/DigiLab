@@ -75,11 +75,10 @@ end
 
 % Create initial concentration vector
 if isempty(x0)
-	x0 = model.x.tens;
-elseif size(x0,1) ~= size(model.x.tens)
-	x0(length(model.x.tens)) = 0;
+	x0 = model.conc.tens;
+elseif size(x0,1) ~= size(model.conc.tens)
+	x0(length(model.conc.tens)) = 0;
 end
-
 
 inpConst = zeros(length(x0),1);
 inpFun = @(t)zeros(length(x0),1);
@@ -87,7 +86,7 @@ inpFun = @(t)zeros(length(x0),1);
 % This component looks at the experiment-simulation name pair, then
 % compares the experiment name with the name given in the 
 if iscell(tmpInp) %state name-val pair
-	protList = model.x.name;
+	protList = model.conc.name;
 	inpFunInd = [];
 	inpConstInd = [];
 	for ii = 1:size(tmpInp,1)
@@ -168,6 +167,7 @@ if ~exist('options','var')
 end
 warnstate('error')
 
+%% Solving
 % Ramping
 if ramp && basal
 	rampSigma = @(t) x0*normFac*normpdf(t,0,0.2);
@@ -212,7 +212,6 @@ end
 
 YComp  = Y;
 Y = compDis(model,Y);      %dissociate complex
-Y = Y(:,model.x.comp>=0);  %remove complex states from Y
 
 warnstate('on') %Switch warnings back to warnings
 end
