@@ -14,7 +14,7 @@ Names = ['p       '
          'inp     '
          '-r      '
          'r       '
-		 'x0      '
+		 'y0      '
 		 'odeopts '
 		 'rd      '
 		 '-b      '];
