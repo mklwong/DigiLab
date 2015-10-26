@@ -204,16 +204,19 @@ case 'insparam'
 % Required outputs are: [model]	
 [model,p] = varargin{:};
 
+% Putting param into tensors
 for ii = 1:length(model.param)
 	freeInd = find(~isnan(model.param(ii).pInd));
 	if ~isempty(freeInd)
 		model.param(ii).tens(freeInd,end) = model.param(ii).tens(freeInd,end).*p(model.param(ii).pInd(freeInd));
 	end
 end
+
+% Putting concentration into tensors
+freeInd = find(~isnan(model.conc.pInd));
 if ~isempty(freeInd)
-	freeInd = ~isnan(model.conc.pInd);
+	model.conc.tens(freeInd,end) = model.conc.tens(freeInd,end).*p(model.conc.pInd(freeInd));
 end
-model.conc.tens(freeInd,end) = model.conc.tens(freeInd,end).*p(model.conc.pInd(freeInd));
 
 varargout = {model};
 end
