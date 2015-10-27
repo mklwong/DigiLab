@@ -1,4 +1,4 @@
-function model = parseModel(model,p,varargin)
+function model = parseModel(modelname,p,varargin)
 
 % First determine if ODE model or not. Currently done using error checking
 % because not sure how to test if model is linked to a function or a
@@ -13,7 +13,8 @@ Names = ['expComp ';
 
 % Default options
 expComp = true;
-rxnRules = @odeKinetic;
+model.name = modelname;
+model.rxnRules = @odeKinetic;
 	 
 if ~exist('p')
 	p = [];
@@ -26,7 +27,7 @@ for ii = 1:length(varargin)
 			case lower(deblank(Names(1,:)))
 				expComp = varargin{ii+1};
 			case lower(deblank(Names(2,:)))
-				rxnRules = varargin{ii+1};
+				model.rxnRules = varargin{ii+1};
 			case []
 				error('Expecting Option String in input');
 			otherwise
@@ -37,41 +38,36 @@ end
 
 %% Kernel
 
-modType = modelType(model);
+modType = modelType(model.name);
 
 if strcmp(modType,'ode15s')
 	odeFile = model;
 	if nargin == 2
-		mod = @(t,x) odeFile(t,x,p);
+		model = @(t,x) odeFile(t,x,p);
 	else
-		mod = @(t,x,p) odeFile(t,x,p);
+		model = @(t,x,p) odeFile(t,x,p);
 	end
 elseif strcmp(modType,'QSSA')
-	if isa(model,'function_handle')
-		model = func2str(model);
+	if isa(model.name,'function_handle')
+		model.name = func2str(model.name);
 	end
 
 	% Parsing models
-	if ischar(model)
-		if strcmp(model((end-1):end),'.m')
-			mod = parseModelm(model,rxnRules,expComp,p);
-		elseif exist([model '.m'],'file')
-			mod = parseModelm(model,rxnRules,expComp,p);
-		elseif strcmp(model((end-3):end),'.xml')
-			mod = parseModelSBML(model);
-		elseif exist([model '.xml'],'file')
-			mod = parseModelSBML(model);
+	if ischar(model.name)
+		if strcmp(model.name((end-1):end),'.m')
+			model = parseModelm(model,expComp,p);
+		elseif exist([model.name '.m'],'file')
+			model = parseModelm(model,expComp,p);
+		elseif strcmp(model.name((end-3):end),'.xml')
+			model = parseModelSBML(model.name);
+		elseif exist([model.name '.xml'],'file')
+			model = parseModelSBML(model.name);
 		else
 			error('findTC:modelNotFound','Model file not found. Only SBML or .m files accepted')
 		end
-		mod.name = model;
-	elseif isstruct(model)
-		mod = model;
 	else
 		error('findTC:modelClassUnknown','Unable to process model. Check model type')
 	end
-	
-	model = mod;
 	
 	% Impose passed parameter on reaction parameters, else use default in
 	% tensor
@@ -79,7 +75,7 @@ elseif strcmp(modType,'QSSA')
 		if isrow(p)
 			p = p';
 		end
-		model = rxnRules('insParam',model,p);
+		model = model.rxnRules('insParam',model,p);
 	end
 else
 	error('modelObjective:badModelInput','Invalid model passed. Check inputs')

@@ -1,4 +1,4 @@
-function out = parseModelm(model,rxnRules,expComp,p)
+function model = parseModelm(model,expComp,p)
 
 %   out = parseModelm(model,debug)
 %
@@ -119,13 +119,11 @@ rxn(end).label = [];
     
 v = rxn; %Legacy code. For backward compatibility.
 
-if isa(model,'function_handle')
-	model = func2str(model);
+if isa(model.name,'function_handle')
+	model.name = func2str(model.name);
 end
 
-out.name = model;
-
-run(model); 
+run(model.name); 
 %loads the following 
 %	- spcComp: compartment info for model.
 %	- modSpc:  species infor for model
@@ -155,7 +153,7 @@ conc.comp    = ones(a,1);   % Compartment Index
 conc.pInd    = nan(a,1);    % Vector showing the parameter index a free state will use
 
 % Initialise parameters
-param = rxnRules('ini');
+param = model.rxnRules('ini');
 
 for ii = 1:length(param) % Create pInd for all params.
 	param(ii).pInd = nan;
@@ -226,7 +224,7 @@ for ii=1:length(rxn)
     [rxn(ii).Km,freeParam(2),grp(2),bnd{2}] = testPar(rxn(ii).Km);
 	
 	%% Turn reactions into maths using reaction rules
-    [reqTens,tensVal,parDesc,conc] = rxnRules('rxnRules',rxn(ii),conc,expComp,ii);
+    [reqTens,tensVal,parDesc,conc] = model.rxnRules('rxnRules',rxn(ii),conc,expComp,ii);
 	
 	tensNames = {param.name};
 	
@@ -307,9 +305,9 @@ dataSpc(rmXData,:) = [];
 pFit.sim2dat = dataSpc;
 
 %% Compile output
-out.conc = conc;
-out.pFit = pFit;
-out.param = param;
+model.conc = conc;
+model.pFit = pFit;
+model.param = param;
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%End Main Function%%%%%

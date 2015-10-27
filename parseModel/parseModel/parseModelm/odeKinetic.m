@@ -27,6 +27,15 @@ case 'ini'
 	param(4).name = 'k0';
 	param(4).tens = nan(1,2);
 	
+	param(5).name = 'kMM';
+	param(5).tens = nan(1,4);
+	
+	param(6).name = 'KmMM';
+	param(6).tens = nan(1,2);
+	
+	param(7).name = 'n';
+	param(7).tens = nan(1,2);
+	
 	varargout = {param};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -155,12 +164,8 @@ switch rxnType
 		end
 		
 		% Maths
-		try
 		tensVal   = {[[subIndx  subVec*subIndx'  -k*overlap./x.comp(subIndx)];
 					  [prodIndx prodVec*subIndx'  k*overlap*(1./x.comp(prodIndx))]]};
-		catch
-			keyboard
-		end
 	case 'enzQSSA'
 		if expComp
 			%Make new complex species
@@ -219,4 +224,45 @@ if ~isempty(freeInd)
 end
 
 varargout = {model};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+case 'nondim'
+%Required inputs are [model,tspan,normInp]
+%Required outputs are [model]
+
+[model,tspan,normInp] = varargin{:};
+
+model.tensor.k0 = model.tensor.k0*(tspan(end)-tspan(1));
+model.tensor.k1 = model.tensor.k1*(tspan(end)-tspan(1));
+model.tensor.k2(:,end) = model.tensor.k2(:,end)*(tspan(end)-tspan(1));
+
+model.basalSigma = @(t) model.tensor.k0*ones(1,length(t)); 
+model.fullSigma = @(t) normInp(t) + model.tensor.k0*ones(1,length(t)); 
+
+varargout{1} = model;
+
+case 'dyneqn'
+%Required inputs are [t,x,model]
+%Required outputs are [dx_dt]
+
+[t,x,model] = varargin{:};
+x(x<0) = 0; %sometimes the system goes to less than zero. When it wants to do this, set it to zero
+
+M = zeros(size(model.tensor.k1));
+L = M;
+
+MTmp = sparse(model.tensor.G(:,1),model.tensor.G(:,3),x(model.tensor.G(:,2))./model.tensor.G(:,4));
+[a,b] = size(MTmp);
+M(1:a,1:b) = MTmp;
+
+LTmp = sparse(model.tensor.k2(:,1),model.tensor.k2(:,2),model.tensor.k2(:,4).*x(model.tensor.k2(:,3)));
+[a,b] = size(LTmp);
+L(1:a,1:b) = LTmp;
+
+try
+	varargout{1} = (eye(length(x))+M)\(L*x+model.tensor.k1*x+model.k0(t));
+catch
+	keyboard
+end
+
 end
