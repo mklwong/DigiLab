@@ -71,7 +71,7 @@ elseif strcmp(modType,'QSSA')
 	
 	% Impose passed parameter on reaction parameters, else use default in
 	% tensor
-	if nargin == 2
+	if ~isempty(p)
 		if isrow(p)
 			p = p';
 		end

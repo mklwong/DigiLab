@@ -82,3 +82,11 @@ kQSSA = [1 2 1 2];
 [tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k),[0 10],x0);
 [tMod,~,YMod] = findTC(@enzKinetic,tReal,'p',kQSSA,'-b');
 resid(10) = sum(YReal(end,1)-YMod(end,1));
+
+% Hill Function
+method = 'hillFun';
+x0 = [1 0 10 0 0 0 0];
+k = [1 1 1 1 1 1 ];
+[tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k),[0 10],x0);
+[tMod,~,YMod] = findTC(@hillFun,tReal,'p',k,'y0',x0(1:3),'-b');
+resid(11) = sum(YReal(end,1)-YMod(end,1));

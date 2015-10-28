@@ -27,7 +27,10 @@ switch type
         dx_dt(4) = -k(4)*x(4)*x(5)+k(5)*x(6)+k(3)*x(3);
         dx_dt(5) = -k(4)*x(4)*x(5)+k(5)*x(6)+k(6)*x(6);
         dx_dt(6) =  k(4)*x(4)*x(5)-k(5)*x(6)-k(6)*x(6);
-        
+	case 'hillFun'
+		dx_dt(1) = -k(1)*x(1)*x(3).^k(3)/(k(2)+x(1).^k(3));
+        dx_dt(2) =  k(1)*x(1)*x(3).^k(3)/(k(2)+x(1).^k(3));
+		dx_dt(3) = 0;
 end
 dx_dt(7) = 0;
 dx_dt = dx_dt';

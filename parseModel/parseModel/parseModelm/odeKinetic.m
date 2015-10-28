@@ -10,10 +10,13 @@ function varargout = odeKinetic(method,varargin)
 % standard when adjusting reaction rates for volume differences.
 
 switch lower(deblank(method))
+	
 case 'ini'
 	% Put your tensors into the parameter "param" in any for you want. Note
 	% tensors will be populated down the row. The "name" field is required
 	% and must contain a string.
+	%
+	% These are what will appear in the kinetic equation
 	
 	param(1).name = 'Km';
 	param(1).tens = nan(1,4);
@@ -27,22 +30,37 @@ case 'ini'
 	param(4).name = 'k0';
 	param(4).tens = nan(1,2);
 	
-	param(5).name = 'kMM';
+	param(5).name = 'k1MM';
 	param(5).tens = nan(1,4);
 	
 	param(6).name = 'KmMM';
-	param(6).tens = nan(1,2);
+	param(6).tens = nan(1,4);
 	
-	param(7).name = 'n';
-	param(7).tens = nan(1,2);
+	param(7).name = 'Hill_n';
+	param(7).tens = nan(1,4);
 	
-	varargout = {param};
+	% All possible fields in a reaction. These are what will appear in
+	% 'rxnrules'
+	rxn = struct();
+	rxn(end).label = [];
+    rxn(end).sub = [];  
+    rxn(end).prod= []; 
+    rxn(end).enz = [];
+	rxn(end).Km = [];
+    rxn(end).k  = [];  
+	rxn(end).A  = [];
+	rxn(end).n  = [];
+	
+	varargout = {param,rxn};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 case 'rxnrules'
 % Require inputs are: [rxn,x,expComp]
-% Required outputs are: [reqTens,tensVal,paramDesc,x]	
+% Required outputs are: [reqTens,tensVal,paramDesc,x*]	
+%	* x is used when new species need to be created. It is passed in the
+%	output to inform the rest of the program of the species change it
+%	implements
 %
 % Ensure that when collapsing the tensors, that the tensor collapses into
 % the first column. I.e. the index of the actual derivative in the tensor
@@ -51,9 +69,7 @@ case 'rxnrules'
 % E.g. index    i        j         k         value
 %     Param = [ 1        3         4          104  ];
 %
-% Derivative is dx_dt = param*x*x;
-%
-% We require dx_dt(1) = 104*x(3)*x(4)
+% Rate is dx_dt = param*x*x. The indices implies dx_dt(1) = 104*x(3)*x(4)
 
 [rxn,x,expComp,ii] = varargin{:};
 
@@ -87,6 +103,8 @@ elseif nSub == 1
             subIndx   = [enzIndx;subIndx];
             prodIndx  = [enzIndx;prodIndx];
             rxnType = 'bi';
+		elseif ~isempty(rxn.n)
+			rxnType = 'hillFun';
         elseif ~isempty(rxn.Km)
             rxnType = 'enzQSSA';
         else
@@ -96,7 +114,7 @@ elseif nSub == 1
         rxnType = 'uni';
     end
 elseif nSub == 2
-    rxnType = 'bi';
+	rxnType = 'bi';
 else
     error('parseModelm:TooManySubstrates',['There are too many substrates in reaction ' num2str(ii)])
 end
@@ -106,6 +124,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 k  = rxn.k;
 Km = rxn.Km;
+n  = rxn.n;
 
 overlap = rxn.A;
 
@@ -174,7 +193,11 @@ switch rxnType
 			x.comp(compIndx) = x.comp(subIndx); %Assume complex formed is in same compartment as substrate
 			x.tens(compIndx) = 0;
 			x.pInd(compIndx) = NaN;
-			try
+
+			%Insert tensor values
+			reqTens   = {'k1','Km'};
+			paramDesc = {['kc   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
+						 ['Km   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
 			tensVal   = {[subIndx     compIndx      -k*overlap*(1./x.comp(subIndx));
 						  prodIndx prodVec*compIndx  k*overlap*(1./x.comp(prodIndx))];
 						 [subIndx   subIndx enzIndx  Km;
@@ -183,24 +206,28 @@ switch rxnType
 						  enzIndx   enzIndx subIndx  Km;
 						  compIndx  subIndx enzIndx -Km;
 						  compIndx  enzIndx subIndx -Km]};
-			catch msg
-				printErr(msg)
-				keyboard
-			end
-			reqTens   = {'k1','Km'};
-			paramDesc = {['kc   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
-						 ['Km   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
 		else
+			reqTens   = {'k2','Km'};
+			paramDesc = {['kc/Km : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
+						 ['Km    : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
 			tensVal   = {[subIndx      subIndx enzIndx       -k*overlap*(1./x.comp(subIndx));
 						  prodIndx prodVec*[subIndx enzIndx]  k*overlap*(1./x.comp(prodIndx))];
 						  [subIndx subIndx enzIndx  Km;
 						   subIndx enzIndx subIndx  Km;
 						   enzIndx subIndx enzIndx  Km;
 						   enzIndx enzIndx subIndx  Km]};
-			reqTens   = {'k2','Km'};
-			paramDesc = {['kc/Km : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
-						 ['Km    : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
 		end
+	case 'hillFun'
+		reqTens   = {'k1MM','KmMM','Hill_n'};
+			paramDesc = {['kc_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
+						 ['Km_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
+						 ['n_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
+			tensVal   = {[subIndx  enzIndx subIndx -k*overlap*(1./x.comp(subIndx));
+						 prodIndx  enzIndx subIndx  k*overlap*(1./x.comp(prodIndx))];
+						 [subIndx  enzIndx subIndx Km;
+						 prodIndx  enzIndx subIndx Km];
+						  [subIndx enzIndx subIndx  n;
+						 prodIndx  enzIndx subIndx  n];};
 end
 varargout = {reqTens,tensVal,paramDesc,x};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -210,10 +237,23 @@ case 'insparam'
 [model,p] = varargin{:};
 
 % Putting param into tensors
+x0 = model.conc.tens;
 for ii = 1:length(model.param)
 	freeInd = find(~isnan(model.param(ii).pInd));
 	if ~isempty(freeInd)
 		model.param(ii).tens(freeInd,end) = model.param(ii).tens(freeInd,end).*p(model.param(ii).pInd(freeInd));
+	end
+	% Pre-generate full matrix if possible
+	if size(model.param(ii).tens,2)==2
+		model.tensor.k0 = full(sparse(model.param(ii).tens(:,1),ones(size(model.param(ii).tens(:,1))),model.param(ii).tens(:,2)));
+		if length(model.tensor.k0)~= length(x0)
+			model.tensor.k0(size(x0,1),1) = 0;
+		end
+	elseif size(model.param(ii).tens,2)==3
+		model.tensor.k1 = full(sparse(model.param(ii).tens(:,1),model.param(ii).tens(:,2),model.param(ii).tens(:,3)));
+		if (size(model.tensor.k1,1)~= length(x0) || size(model.tensor.k1,2)~= length(x0))
+			model.tensor.k1(size(x0,1),size(x0,1)) = 0;
+		end
 	end
 end
 
@@ -234,11 +274,22 @@ case 'nondim'
 
 model.tensor.k0 = model.tensor.k0*(tspan(end)-tspan(1));
 model.tensor.k1 = model.tensor.k1*(tspan(end)-tspan(1));
-model.tensor.k2(:,end) = model.tensor.k2(:,end)*(tspan(end)-tspan(1));
+model.param(2).tens(:,end) = model.param(2).tens(:,end)*(tspan(end)-tspan(1));
+model.param(5).tens(:,end) = model.param(5).tens(:,end)*(tspan(end)-tspan(1));
 
 model.basalSigma = @(t) model.tensor.k0*ones(1,length(t)); 
 model.fullSigma = @(t) normInp(t) + model.tensor.k0*ones(1,length(t)); 
 
+varargout{1} = model;
+
+case 'ramp'
+% This part of the script modifies the reaction rates such that no reaction
+% occurs during the ramping phase.
+model = varargin{1};
+	model.tensor.k0 = model.tensor.k0*0;
+	model.tensor.k1 = model.tensor.k1*0;
+	model.param(2).tens(:,end) = 0;
+	model.param(5).tens(:,end) = 0;
 varargout{1} = model;
 
 case 'dyneqn'
@@ -250,17 +301,24 @@ x(x<0) = 0; %sometimes the system goes to less than zero. When it wants to do th
 
 M = zeros(size(model.tensor.k1));
 L = M;
+hillTerm = M;
 
-MTmp = sparse(model.tensor.G(:,1),model.tensor.G(:,3),x(model.tensor.G(:,2))./model.tensor.G(:,4));
+model.param(5).tens(:,4) = model.param(5).tens(:,4).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
+
+MTmp = sparse(model.param(1).tens(:,1),model.param(1).tens(:,3),x(model.param(1).tens(:,2))./model.param(1).tens(:,4));
 [a,b] = size(MTmp);
 M(1:a,1:b) = MTmp;
 
-LTmp = sparse(model.tensor.k2(:,1),model.tensor.k2(:,2),model.tensor.k2(:,4).*x(model.tensor.k2(:,3)));
+LTmp = sparse(model.param(2).tens(:,1),model.param(2).tens(:,2),model.param(2).tens(:,4).*x(model.param(2).tens(:,3)));
 [a,b] = size(LTmp);
 L(1:a,1:b) = LTmp;
 
+hillTmp = sparse(model.param(5).tens(:,1),model.param(5).tens(:,2),model.param(5).tens(:,4));
+[a,b] = size(hillTmp);
+hillTerm(1:a,1:b) = hillTmp;
+
 try
-	varargout{1} = (eye(length(x))+M)\(L*x+model.tensor.k1*x+model.k0(t));
+	varargout{1} = (eye(length(x))+M)\(L*x+model.tensor.k1*x+model.k0(t)+hillTerm*x);
 catch
 	keyboard
 end

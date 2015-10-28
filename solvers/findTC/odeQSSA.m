@@ -59,10 +59,12 @@ for ii = 1:length(varargin)
 end
 
 %% Compile model if new one inserted
-if isempty(p)
-	model = prepareTensor(model);
+if ~isstruct(model)
+	model = parseModel(model,p);
 else
-	model = prepareTensor(model,p);
+	if ~isempty(p)
+		model = model.rxnRules('insParam',model,p);
+	end
 end
 
 % %Correct dimension of x0 and tspan
@@ -167,8 +169,7 @@ warnstate('error')
 if ramp && basal
 	modelRB = model;
 	modelRB.k0 = @(t) x0*normFac*normpdf(t,0,0.2);
-	modelRB.tensor.k1 = model.tensor.k1*0;
-	modelRB.tensor.k2 = zeros(0,4);
+	modelRB = model.rxnRules('ramp',modelRB);
 	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelRB);
 	[t,Y] = ode45(dx_dt,[0 1],x0*0,options);
 	x0 = Y(end,:)';
@@ -194,8 +195,7 @@ end
 if ramp
 	modelR = model;
 	modelR.k0 = @(t) (inpConst + x0)*normFac*normpdf(t,0,0.2);
-	modelR.tensor.k1 = model.tensor.k1*0;
-	modelR.tensor.k2 = zeros(0,4);
+	modelR = model.rxnRules('ramp',modelR);
 	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelR);
 	[t,Y] = ode45(dx_dt,[0 1],x0*0,options);
 	x0 = Y(end,:);

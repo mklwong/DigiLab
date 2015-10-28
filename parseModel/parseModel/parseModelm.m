@@ -108,14 +108,9 @@ function model = parseModelm(model,expComp,p)
 %%%%%%%%%%%%%%%%%%%%%
 %% Import model file
 %%%%%%%%%%%%%%%%%%%%%
-rxn = struct();
-rxn(end).label = [];
-    rxn(end).sub = [];  
-    rxn(end).prod= []; 
-    rxn(end).enz = [];
-	rxn(end).Km = [];
-    rxn(end).k  = [];  
-	rxn(end).A  = [];
+
+% Initialise parameters
+[param,rxn] = model.rxnRules('ini');
     
 v = rxn; %Legacy code. For backward compatibility.
 
@@ -152,8 +147,7 @@ conc.name    = cell(a,1);   % Species name
 conc.comp    = ones(a,1);   % Compartment Index
 conc.pInd    = nan(a,1);    % Vector showing the parameter index a free state will use
 
-% Initialise parameters
-param = model.rxnRules('ini');
+
 
 for ii = 1:length(param) % Create pInd for all params.
 	param(ii).pInd = nan;
@@ -223,6 +217,12 @@ for ii=1:length(rxn)
     % Test parameter for 'Km'
     [rxn(ii).Km,freeParam(2),grp(2),bnd{2}] = testPar(rxn(ii).Km);
 	
+	% Test parameter for 'n'
+    [rxn(ii).n,freeParam(3),grp(3),bnd{3}] = testPar(rxn(ii).n);
+	
+	% Test parameter for 'A'
+    [rxn(ii).A,freeParam(4),grp(4),bnd{4}] = testPar(rxn(ii).A);
+	
 	%% Turn reactions into maths using reaction rules
     [reqTens,tensVal,parDesc,conc] = model.rxnRules('rxnRules',rxn(ii),conc,expComp,ii);
 	
@@ -242,8 +242,17 @@ for ii=1:length(rxn)
 		end
 		
 		% Insert parameter indicies for free parameters
+		try
+			freeParam(jj);
+		catch
+			keyboard
+		end
 		if freeParam(jj)
+			try
 			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bnd{jj},Bnd.(reqTens{jj}),paramGrp,grp(jj));
+			catch
+				keyboard
+			end
 			param(reqIndx).pInd(appndIndx) = putParInd;               %Append parameter index
 		end
 
@@ -251,7 +260,6 @@ for ii=1:length(rxn)
 			param(reqIndx).tens(appndIndx,:) = tensVal{jj};               %Append tensor
 		catch msg
 			printErr(msg)
-			keyboard
 		end
     end
 end
