@@ -15,13 +15,6 @@
 % must be taken when using this program with a prior. A way to ensure this
 % problem is not 
 
-if ParMode
-	parCheck = parComp('open');
-	if parCheck == -1
-		ParMode = false;
-	end
-end
-
 %% Kernel
 % if exist(data,'file')
 % 	load(data);  % Load objective
