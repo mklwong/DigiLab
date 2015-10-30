@@ -147,8 +147,6 @@ conc.name    = cell(a,1);   % Species name
 conc.comp    = ones(a,1);   % Compartment Index
 conc.pInd    = nan(a,1);    % Vector showing the parameter index a free state will use
 
-
-
 for ii = 1:length(param) % Create pInd for all params.
 	param(ii).pInd = nan;
 end
@@ -165,17 +163,16 @@ for ii = 1:size(spcComp,1)
 	% Process parameter
     [val,freeParam,grp] = testPar(spcComp{ii,2});
 	
-	parDesc = ['Conc : ' modSpc{ii,1}];
+	parDesc = ['Comp : ' spcComp{ii,1}];
 	if freeParam
-		if length(modSpc{ii,3})==3
-			custBnd = modSpc{ii,3}(2:3);
+		if length(spcComp{ii,2})==3
+			custBnd = spcComp{ii,2}(2:3);
 		else
 			custBnd = [];
 		end
 		[pFit,conc,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,conc,custBnd,Bnd.Conc,paramGrp,grp);
 		spcComp{ii,2} = p(putParInd)*val; % Save either parameter value of parameter multiplicative factor
 	end
-	
 end		
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
