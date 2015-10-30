@@ -63,6 +63,9 @@ if ~isstruct(model)
 	model = parseModel(model,p);
 else
 	if ~isempty(p)
+		if isrow(p)
+			p = p';
+		end
 		model = model.rxnRules('insParam',model,p);
 	end
 end

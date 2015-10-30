@@ -239,7 +239,11 @@ x0 = model.conc.tens;
 for ii = 1:length(model.param)
 	freeInd = find(~isnan(model.param(ii).pInd));
 	if ~isempty(freeInd)
+		try
 		model.param(ii).tens(freeInd,end) = model.param(ii).tens(freeInd,end).*p(model.param(ii).pInd(freeInd));
+		catch
+			keyboard
+		end
 	end
 	% Pre-generate full matrix if possible
 	if size(model.param(ii).tens,2)==2

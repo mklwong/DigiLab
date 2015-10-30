@@ -115,7 +115,7 @@ else
 end
 
 %% Process prior
-if ~isempty(opts.prior)
+if ~isempty(opts.prior.pts)
 	prior = opts.prior;
 	[prir_n,~] = size(prior.pts);
 	% Remove prior points that are outside the boundary
@@ -200,10 +200,10 @@ while status == 1
                 fprintf('%4.2e\n',runVar.logP)
 			end
 		end
-        if ~isempty(opts.prior)
+        if ~isempty(opts.prior.pts)
 			% Select new point from prior based on goodness of fit of the
 			% prior
-			fprintf('Selected randomly from prior')
+			fprintf('Selected randomly from prior\n')
             rngPt = rand(1);
 			newPtInd = ceil(interp1([0;priorP],0:length(priorP),rngPt));
             ptTest = opts.prior.pts(newPtInd,:);
@@ -212,7 +212,7 @@ while status == 1
 			% If only a single prior point is given, do not jump around the
 			% parameter space by reseeding. Also do not put boundaries on
 			% the fitting.
-			fprintf('Selected from initial start point')
+			fprintf('Selected from initial start point\n')
 			ptTest = opts.pt0;
 			logPNew  = runVar.obj(ptTest);
 			opts.resample = Inf;
@@ -228,7 +228,7 @@ while status == 1
 			if sum(runVar.bnd(:,1)==0 | isinf(runVar.bnd(:,2)))
 				error('mcmc:unboundNoPrior','Cannot be run with no boundary when no prior is given')
 			end
-			fprintf('Selected randomly from within boundary')
+			fprintf('Selected randomly from within boundary\n')
             ptTest = rand(size(runVar.bnd,1),1).*(runVar.bnd(:,2)-runVar.bnd(:,1))+runVar.bnd(:,1);
             logPNew  = runVar.obj(ptTest);
             opts.resample = Inf;
