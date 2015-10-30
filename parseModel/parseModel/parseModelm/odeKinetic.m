@@ -132,8 +132,6 @@ if isempty(overlap)
 	overlap = 1;
 end
 
-prodComp = x.comp(prodIndx);
-subComp  = x.comp(subIndx);
 subVec  = ones(size(subIndx));
 prodVec = ones(size(prodIndx));
 
@@ -162,8 +160,8 @@ switch rxnType
 		
 		% Maths
 			% Everything else
-			tensVal   = {[subIndx         subIndx              -k*overlap*subComp/subComp;
-						  prodIndx        subIndx'*prodVec      k*overlap*subComp*(1./prodComp)]};
+			tensVal   = {[subIndx         subIndx              -k*overlap*subVec;
+						  prodIndx        subIndx'*prodVec      k*overlap*prodVec]};
 	case 'bi'
 		% Header
 		reqTens   = {'k2'};
@@ -178,13 +176,13 @@ switch rxnType
 			paramDesc = {['kc/Km: ' x.name{subIndx(2)} ' -> ' x.name{prodIndx(2)} '| ' x.name{subIndx(1)}]};
 		end
 		
-		if isempty(rxn.A)
-			overlap = min(x.comp(subIndx));
-		end
-		
 		% Maths
-		tensVal   = {[[subIndx  subVec*subIndx'  -k*overlap./x.comp(subIndx)];
-					  [prodIndx prodVec*subIndx'  k*overlap*(1./x.comp(prodIndx))]]};
+		try
+		tensVal   = {[[subIndx  subVec*subIndx'  -k*overlap*subVec];
+					  [prodIndx prodVec*subIndx'  k*overlap*prodVec]]};
+		catch
+			keyboard
+		end
 	case 'enzQSSA'
 		if expComp
 			%Make new complex species
@@ -198,8 +196,8 @@ switch rxnType
 			reqTens   = {'k1','Km'};
 			paramDesc = {['kc   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['Km   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-			tensVal   = {[subIndx     compIndx      -k*overlap*(1./x.comp(subIndx));
-						  prodIndx prodVec*compIndx  k*overlap*(1./x.comp(prodIndx))];
+			tensVal   = {[subIndx     compIndx      -k*overlap;
+						  prodIndx prodVec*compIndx  k*overlap];
 						 [subIndx   subIndx enzIndx  Km;
 						  subIndx   enzIndx subIndx  Km;
 						  enzIndx   subIndx enzIndx  Km;
@@ -210,8 +208,8 @@ switch rxnType
 			reqTens   = {'k2','Km'};
 			paramDesc = {['kc/Km : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['Km    : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-			tensVal   = {[subIndx      subIndx enzIndx       -k*overlap*(1./x.comp(subIndx));
-						  prodIndx prodVec*[subIndx enzIndx]  k*overlap*(1./x.comp(prodIndx))];
+			tensVal   = {[subIndx      subIndx enzIndx       -k*overlap*subVec;
+						  prodIndx prodVec*[subIndx enzIndx]  k*overlap*prodVec];
 						  [subIndx subIndx enzIndx  Km;
 						   subIndx enzIndx subIndx  Km;
 						   enzIndx subIndx enzIndx  Km;
@@ -222,8 +220,8 @@ switch rxnType
 			paramDesc = {['kc_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['Km_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['n_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-			tensVal   = {[subIndx  enzIndx subIndx -k*overlap*(1./x.comp(subIndx));
-						 prodIndx  enzIndx subIndx  k*overlap*(1./x.comp(prodIndx))];
+			tensVal   = {[subIndx  enzIndx subIndx -k*overlap*subVec;
+						 prodIndx  enzIndx subIndx  k*overlap*prodVec];
 						 [subIndx  enzIndx subIndx Km;
 						 prodIndx  enzIndx subIndx Km];
 						  [subIndx enzIndx subIndx  n;
@@ -302,8 +300,11 @@ x(x<0) = 0; %sometimes the system goes to less than zero. When it wants to do th
 M = zeros(size(model.tensor.k1));
 L = M;
 hillTerm = M;
+compVal = model.conc.comp;
+sourceComp = compVal';
+sourceComp = sourceComp(ones(1,length(compVal)),:);
 
-model.param(5).tens(:,4) = model.param(5).tens(:,4).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
+model.param(5).tens(:,4) = model.param(5).tens(:,4).*compVal(model.param(5).tens(:,3)).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
 
 MTmp = sparse(model.param(1).tens(:,1),model.param(1).tens(:,3),x(model.param(1).tens(:,2))./model.param(1).tens(:,4));
 [a,b] = size(MTmp);
@@ -312,13 +313,14 @@ M(1:a,1:b) = MTmp;
 LTmp = sparse(model.param(2).tens(:,1),model.param(2).tens(:,2),model.param(2).tens(:,4).*x(model.param(2).tens(:,3)));
 [a,b] = size(LTmp);
 L(1:a,1:b) = LTmp;
+L = L.*sourceComp;
 
 hillTmp = sparse(model.param(5).tens(:,1),model.param(5).tens(:,2),model.param(5).tens(:,4));
 [a,b] = size(hillTmp);
 hillTerm(1:a,1:b) = hillTmp;
 
 try
-	varargout{1} = (eye(length(x))+M)\(L*x+model.tensor.k1*x+model.k0(t)+hillTerm*x);
+	varargout{1} = ((eye(length(x))+M)\(L*x+(model.tensor.k1.*sourceComp)*x+model.k0(t).*compVal+hillTerm*x))./compVal;
 catch
 	keyboard
 end
