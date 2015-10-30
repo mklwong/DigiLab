@@ -4,15 +4,15 @@
 %
 % spcComp = {'Compartment name', relative size};
 %
-spcComp = {'Cyto', 1;
-           };
+spcComp = {'Cyto', NaN;
+           'Cyto2' NaN};
 
 %% Model species definition
 %
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
-modSpc = {  'A'         ,'Cyto'  , 1;
-          'B'         ,'Cyto'  , 0;
+modSpc = {'A'         ,'Cyto'  , 1;
+          'B'         ,'Cyto2' , 0;
           'C'         ,'Cyto'  , 0};
 
 %% Relationship between simulation state and model state association

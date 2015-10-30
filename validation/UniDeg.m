@@ -4,14 +4,14 @@
 %
 % spcComp = {'Compartment name', relative size};
 %
-spcComp = {'Cyto', 1;
-           };
+spcComp = {'Cyto', NaN;
+           'Cyto2' NaN};
 
 %% Model species definition
 %
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
-modSpc = {  'A'         ,'Cyto'  , 1;
+modSpc = {'A'         ,'Cyto'  , 1;
           'B'         ,'Cyto'  , 0;
           'C'         ,'Cyto'  , 0};
 
