@@ -13,7 +13,7 @@ function [t,Y,YComp,status] = findTC(model,tspan,varargin)
 %	If using a QSSA type file, the following rules apply.
 %
 %   Optional inputs are passed as parameter/value pairs
-%       > x0    : Initial condition. Optional input. If not entered, will
+%       > y0    : Initial condition. Optional input. If not entered, will
 %                 find from the topology file. If a custom topology is
 %                 used, this must be included.
 %       > p     : parameters. An either be a vector of numbers, of a struct

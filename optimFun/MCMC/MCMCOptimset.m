@@ -57,7 +57,10 @@ Names = ['PtNo     ' %number of points to store  | defaults at 10,000
 
 opts.ptNo      = 10000;
 opts.T         = 1;
-opts.prior     = [];
+	 prior.pts  = [];
+	 prior.logP = [];
+	 prior.T    = 1;
+opts.prior     = prior;
 opts.Pmin      = 0;
 opts.rjtRto    = 0.5;
 opts.disp      = 'off';

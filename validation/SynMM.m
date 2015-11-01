@@ -4,14 +4,14 @@
 %
 % spcComp = {'Compartment name', relative size};
 %
-xComp = {'Cyto', 1;
-           };
+spcComp = {'Cyto', NaN;
+           'Cyto2' NaN};
 
 %% Model species definition
 %
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
-xMod = {  'A'         ,'Cyto'  , 0;
+modSpc = {'A'         ,'Cyto'  , 0;
           'B'         ,'Cyto'  , 1;
           'C'         ,'Cyto'  , 0};
 
@@ -19,7 +19,7 @@ xMod = {  'A'         ,'Cyto'  , 0;
 
 % dataSpc = {'Exp State Name',{'Sim State Name 1','Sim State Name 2'}};
 
- xData = {};
+ dataSpc = {};
 
 %% Features of default parameters
 % Bnd* = [lb ub]

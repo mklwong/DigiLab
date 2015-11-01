@@ -1,4 +1,4 @@
-function out = parseModelm(model,rxnRules,expComp,p)
+function model = parseModelm(model,expComp,p)
 
 %   out = parseModelm(model,debug)
 %
@@ -108,24 +108,17 @@ function out = parseModelm(model,rxnRules,expComp,p)
 %%%%%%%%%%%%%%%%%%%%%
 %% Import model file
 %%%%%%%%%%%%%%%%%%%%%
-rxn = struct();
-rxn(end).label = [];
-    rxn(end).sub = [];  
-    rxn(end).prod= []; 
-    rxn(end).enz = [];
-	rxn(end).Km = [];
-    rxn(end).k  = [];  
-	rxn(end).A  = [];
+
+% Initialise parameters
+[param,rxn] = model.rxnRules('ini');
     
 v = rxn; %Legacy code. For backward compatibility.
 
-if isa(model,'function_handle')
-	model = func2str(model);
+if isa(model.name,'function_handle')
+	model.name = func2str(model.name);
 end
 
-out.name = model;
-
-run(model); 
+run(model.name); 
 %loads the following 
 %	- spcComp: compartment info for model.
 %	- modSpc:  species infor for model
@@ -154,9 +147,6 @@ conc.name    = cell(a,1);   % Species name
 conc.comp    = ones(a,1);   % Compartment Index
 conc.pInd    = nan(a,1);    % Vector showing the parameter index a free state will use
 
-% Initialise parameters
-param = rxnRules('ini');
-
 for ii = 1:length(param) % Create pInd for all params.
 	param(ii).pInd = nan;
 end
@@ -173,17 +163,16 @@ for ii = 1:size(spcComp,1)
 	% Process parameter
     [val,freeParam,grp] = testPar(spcComp{ii,2});
 	
-	parDesc = ['Conc : ' modSpc{ii,1}];
+	parDesc = ['Comp : ' spcComp{ii,1}];
 	if freeParam
-		if length(modSpc{ii,3})==3
-			custBnd = modSpc{ii,3}(2:3);
+		if length(spcComp{ii,2})==3
+			custBnd = spcComp{ii,2}(2:3);
 		else
 			custBnd = [];
 		end
 		[pFit,conc,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,conc,custBnd,Bnd.Conc,paramGrp,grp);
 		spcComp{ii,2} = p(putParInd)*val; % Save either parameter value of parameter multiplicative factor
 	end
-	
 end		
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -225,8 +214,14 @@ for ii=1:length(rxn)
     % Test parameter for 'Km'
     [rxn(ii).Km,freeParam(2),grp(2),bnd{2}] = testPar(rxn(ii).Km);
 	
+	% Test parameter for 'n'
+    [rxn(ii).n,freeParam(3),grp(3),bnd{3}] = testPar(rxn(ii).n);
+	
+	% Test parameter for 'A'
+    [rxn(ii).A,freeParam(4),grp(4),bnd{4}] = testPar(rxn(ii).A);
+	
 	%% Turn reactions into maths using reaction rules
-    [reqTens,tensVal,parDesc,conc] = rxnRules('rxnRules',rxn(ii),conc,expComp,ii);
+    [reqTens,tensVal,parDesc,conc] = model.rxnRules('rxnRules',rxn(ii),conc,expComp,ii);
 	
 	tensNames = {param.name};
 	
@@ -244,8 +239,17 @@ for ii=1:length(rxn)
 		end
 		
 		% Insert parameter indicies for free parameters
+		try
+			freeParam(jj);
+		catch
+			keyboard
+		end
 		if freeParam(jj)
+			try
 			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bnd{jj},Bnd.(reqTens{jj}),paramGrp,grp(jj));
+			catch
+				keyboard
+			end
 			param(reqIndx).pInd(appndIndx) = putParInd;               %Append parameter index
 		end
 
@@ -253,7 +257,6 @@ for ii=1:length(rxn)
 			param(reqIndx).tens(appndIndx,:) = tensVal{jj};               %Append tensor
 		catch msg
 			printErr(msg)
-			keyboard
 		end
     end
 end
@@ -307,9 +310,9 @@ dataSpc(rmXData,:) = [];
 pFit.sim2dat = dataSpc;
 
 %% Compile output
-out.conc = conc;
-out.pFit = pFit;
-out.param = param;
+model.conc = conc;
+model.pFit = pFit;
+model.param = param;
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%End Main Function%%%%%

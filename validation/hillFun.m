@@ -5,20 +5,20 @@
 % spcComp = {'Compartment name', relative size};
 %
 spcComp = {'Cyto', NaN;
-           'Cyto2' NaN};
+           'Cyto2',NaN};
 
 %% Model species definition
 %
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
 modSpc = {'A'         ,'Cyto'  , 1;
-          'B'         ,'Cyto2' , 0};
+          'B'         ,'Cyto'  , 0;
+          'C'         ,'Cyto'  , 1};
 
 %% Relationship between simulation state and model state association
 
 % dataSpc = {'Exp State Name',{'Sim State Name 1','Sim State Name 2'}};
-
- dataSpc = {};
+dataSpc = {};
 
 %% Features of default parameters
 % Bnd* = [lb ub]
@@ -28,6 +28,9 @@ Bnd.k0  = [1e01 1e04];
 Bnd.k1  = [5e-5 5e-1];
 Bnd.k2   = [5e-5 5e-1];
 Bnd.Km   = [1e-2 1e02];
+Bnd.k1MM  = [5e-5 5e-1];
+Bnd.KmMM   = [5e-5 5e-1];
+Bnd.Hill_n   = [1e-2 1e02];
 Bnd.Conc = [1e-1 1e1];
 
 %% Reactions
@@ -43,7 +46,10 @@ Bnd.Conc = [1e-1 1e1];
 %   
 
 %% AKT Translocation Mechanics
-rxn(end+1).label = 'A -> B';
+rxn(end+1).label = 'A -> B | C (Hillfun)';
     rxn(end).sub = 'A';  
     rxn(end).prod= 'B';
+	rxn(end).enz = 'C';
     rxn(end).k   = NaN; 
+	rxn(end).Km  = NaN;
+	rxn(end).n   = NaN;

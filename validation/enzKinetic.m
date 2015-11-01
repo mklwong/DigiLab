@@ -4,23 +4,23 @@
 %
 % spcComp = {'Compartment name', relative size};
 %
-xComp = {'Cyto', 1;
-           };
+spcComp = {'Cyto', NaN;
+           'Cyto2',NaN};
 
 %% Model species definition
 %
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
-xMod = {  'A'         ,'Cyto'  , 1;
-          'B'         ,'Cyto'  , 0;
-          'C'         ,'Cyto'  , 1;
-          'D'         ,'Cyto'  , 1};
+modSpc = {'A'         ,'Cyto'  , 1;
+		  'C'         ,'Cyto'  , 1;
+          'B'         ,'Cyto2' , 0;
+          'D'         ,'Cyto2' , 1};
 
 %% Relationship between simulation state and model state association
 
 % dataSpc = {'Exp State Name',{'Sim State Name 1','Sim State Name 2'}};
 
- xData = {};
+ dataSpc = {};
 
 %% Features of default parameters
 % Bnd* = [lb ub]
@@ -45,15 +45,15 @@ Bnd.Conc = [1e-1 1e1];
 %   
 
 %% AKT Translocation Mechanics
-rxn(end+1).label = 'A -> Phi';
+rxn(end+1).label = 'A -> B | C';
     rxn(end).sub = 'A';
     rxn(end).prod = 'B'; 
     rxn(end).enz = 'C';
     rxn(end).k   = NaN; 
-    rxn(end).Km   = NaN;
-rxn(end+1).label = 'A -> Phi';
+    rxn(end).Km  = NaN;
+rxn(end+1).label = 'B -> A | D';
     rxn(end).sub = 'B';  
     rxn(end).prod = 'A'; 
     rxn(end).enz = 'D';
     rxn(end).k   = NaN; 
-    rxn(end).Km   = NaN; 
+    rxn(end).Km  = NaN; 

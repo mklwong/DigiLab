@@ -1,6 +1,6 @@
 function [pts,logP,status] = MCMC(objfun,pt0,bnd,opts)
 
-% [pstrir,P] = MCMC(objfun,bnd,opts)
+% [pstrir,P] = MCMC(objfun,pt0,bnd,opts)
 %
 % Note the outputted probability is -log(P) of the real probability. Also
 % it is the probability of the tempered landscape.
@@ -50,7 +50,7 @@ if opts.parMode
 	end
 end
 
-%== Add initial point into optimisation settings ==%
+%== Add initial points and functions into optimisation settings ==%
 if ~isempty(pt0)
 	if isrow(pt0)
 		opts.pt0 = pt0;
@@ -58,33 +58,20 @@ if ~isempty(pt0)
 		opts.pt0 = pt0';
 	end
 	if sum(double(opts.pt0<bnd(:,1)' | opts.pt0>bnd(:,2)'))
+		find(double(opts.pt0<bnd(:,1)' | opts.pt0>bnd(:,2)'))
 		error('MCMC:InitialPointOutOfBound','Initial point is outside the required boundary.')
 	end
 end
-
-%== Make sure all points in prior within boundary ==%
-if ~isempty(opts.prior)
-	prior = opts.prior;
-	[prir_n,~] = size(prior.pts);
-	% Remove prior points that are outside the boundary
-	if prir_n>0
-		rmIndx = ~logical(prod(double(prior.pts>(ones(prir_n,1)*bnd(:,1)') & prior.pts<(ones(prir_n,1)*bnd(:,2)')),2));
-		prior.logP(rmIndx) = [];
-		prior.pts(rmIndx,:) = [];
-	end
-	opts.prior = prior;
-end
-
-opts.obj = objfun;
-opts.bnd = bnd;
+runVar.obj = objfun;
+runVar.bnd = bnd;
 
 %% MCMC Kernel split into multi core parallel and single core mode
 if opts.parMode
 	spmd
-		[ptRaw,logPRaw,status] = MCMCRun(opts);
+		[ptRaw,logPRaw,status] = MCMCRun(runVar,opts);
 	end
 else
-    [ptRaw,logPRaw,status] = MCMCRun(opts);
+    [ptRaw,logPRaw,status] = MCMCRun(runVar,opts);
 end
 
 %% Run Completion
@@ -103,7 +90,7 @@ end
 %%%%%%%%%%%%%%%%%%% MCMC Function %%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [ptLocal,logPLocal,status] = MCMCRun(opts)
+function [ptLocal,logPLocal,status] = MCMCRun(runVar,opts)
 % Parallel mode protocols
 % Packet tags are:
 %    1: Sending and receiving points and data
@@ -118,7 +105,7 @@ t1 = tic; %t1 is the MCMC begin time (in global terms)
 t2 = tic; %t2 is the time to last completion checkpoint 
 %this is also the counter used for run termination.
 
-% Existence test for parallel computing parameters
+%% Existence test for parallel computing parameters
 if ~exist('numlabs','builtin')
     numlab = 1;
     labindx = 1;
@@ -127,30 +114,41 @@ else
     labindx = labindex;
 end
 
-objfun = opts.obj;
-bnd    = opts.bnd;
+%% Process prior
+if ~isempty(opts.prior.pts)
+	prior = opts.prior;
+	[prir_n,~] = size(prior.pts);
+	% Remove prior points that are outside the boundary
+	if prir_n>0
+		rmIndx = ~logical(prod(double(prior.pts>(ones(prir_n,1)*runVar.bnd(:,1)') & prior.pts<(ones(prir_n,1)*runVar.bnd(:,2)')),2));
+		prior.logP(rmIndx) = [];
+		prior.pts(rmIndx,:) = [];
+	end
+	opts.prior = prior;
+	clear prior rmIndx prir_n
+end
 
-% Process prior
 if ~isempty(opts.prior)
 	% Extract priors
 	priorPts  = opts.prior.pts;
 	priorLogP = opts.prior.logP;
 	% Remove duplicate probabilities
-	dupIndx = find(priorLogP(1:end-1)-priorLogP(2:end)==0);
+	dupIndx = find(opts.prior.logP(1:end-1)-opts.prior.logP(2:end)==0);
 	priorLogP(dupIndx)  = [];
 	priorPts(dupIndx,:) = [];
 	% Turn objective score into PDF and then CDF for prior
 	[priorP,I] = sort(exp(-priorLogP));
 	priorPts = priorPts(I,:);
-	priorLogP = priorLogP(I);
+	%priorLogP = priorLogP(I);
 	priorP = cumsum(priorP);
 	% Remove low probability points
 	rmPts = priorP<(1e-4*max(priorP));	
 	priorP(rmPts) = [];
-	priorLogP(rmPts) = [];
+	%priorLogP(rmPts) = [];
 	priorPts(rmPts,:) = [];
 	% Normalise CDF to 1
-	priorP = priorP/max(priorP);
+	runVar.priorP = priorP/max(priorP);
+	clear dupIndx rmPts priorLogP priorPts
 end
 
 %% Initialisation
@@ -166,9 +164,9 @@ else
 end
 
 if ~isfield(opts,'pt0')
-	varNo = size(opts.bnd,1);
+	varNo = size(runVar.bnd,1);
 else
-	varNo = length(opts.pt0);
+	varNo = length(runVar.pt0);
 end
 % Initialise variables for storing points
 ptLocal = zeros(ptNoMax,varNo);    
@@ -177,14 +175,16 @@ logPLocal  = nan(ptNoMax,1);
 % Initialise counters and markers
 stallWarn = 0;  %number of stall cycles triggered (program stops when this hits 10)
 pt_n   = 0;
-logP   = Inf;  %Set this to enter point selection and acceptance loop
+runVar.logP   = Inf;  %Set this to enter point selection and acceptance loop
 
 pltHndl    = []; % for initialising the program into the first plot of the run
 adaptFun = opts.adaptFun;
-opts    = adaptFun('initial',varNo,[],opts);
-nprogress = 1;
+dumVar.p0 = varNo; %Dummy runVar for adaptFun
+dumVar.dp = [];
+opts    = adaptFun('initial',dumVar,opts);
+nprogress = 1; %Blocks of progress passed (each block is printed as a debug message)
 acptCnt = int8(rand(1,20)>opts.rjtRto);
-pt_uniQ_n = 0;
+pt_uniQ_n = 0; %Counter for unique points.
 
 % Markov Chain started below.
 status = 1;
@@ -192,42 +192,45 @@ status = 1;
 while status == 1
 	
     %% New active point selection
-    if mod(pt_n,opts.resample)==0 || ~exist('pt','var')
+    if mod(pt_n,opts.resample)==0 || ~isfield(runVar,'pt')
 		if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
             fprintf('New starting point...\n')
-            if exist('pt','var')
+            if isfield(runVar,'pt')
                 fprintf('Existing point:  ')
-                fprintf('%4.2e\n',logP)
+                fprintf('%4.2e\n',runVar.logP)
 			end
 		end
         if ~isempty(opts.prior.pts)
 			% Select new point from prior based on goodness of fit of the
 			% prior
+			fprintf('Selected randomly from prior\n')
             rngPt = rand(1);
 			newPtInd = ceil(interp1([0;priorP],0:length(priorP),rngPt));
-            ptTest = priorPts(newPtInd,:);
-			logPNew  = objfun(ptTest);
+            ptTest = opts.prior.pts(newPtInd,:);
+			logPNew  = runVar.obj(ptTest);
 		elseif isfield(opts,'pt0')
 			% If only a single prior point is given, do not jump around the
 			% parameter space by reseeding. Also do not put boundaries on
 			% the fitting.
+			fprintf('Selected from initial start point\n')
 			ptTest = opts.pt0;
-			logPNew  = objfun(ptTest);
+			logPNew  = runVar.obj(ptTest);
 			opts.resample = Inf;
 			% Remove boundaries of the run, because with only one seed
 			% point, the run is assumed to be exploratory so should be
 			% unbounded.
-			if isempty(bnd)
-				bnd = ones(varNo,2);
-				bnd(:,1) = -Inf;
-				bnd(:,2) = Inf;
+			if isempty(runVar.bnd)
+				runVar.bnd = ones(varNo,2);
+				runVar.bnd(:,1) = -Inf;
+				runVar.bnd(:,2) = Inf;
 			end
 		else
-			if sum(bnd(:,1)==0 | isinf(bnd(:,2)))
+			if sum(runVar.bnd(:,1)==0 | isinf(runVar.bnd(:,2)))
 				error('mcmc:unboundNoPrior','Cannot be run with no boundary when no prior is given')
 			end
-            ptTest = rand(size(bnd,1),1).*(bnd(:,2)-bnd(:,1))+bnd(:,1);
-            logPNew  = objfun(ptTest);
+			fprintf('Selected randomly from within boundary\n')
+            ptTest = rand(size(runVar.bnd,1),1).*(runVar.bnd(:,2)-runVar.bnd(:,1))+runVar.bnd(:,1);
+            logPNew  = runVar.obj(ptTest);
             opts.resample = Inf;
         end % New candidate point
 		
@@ -235,15 +238,15 @@ while status == 1
             fprintf('Candidate point: ')
             fprintf('%4.2e \n',logPNew)
         end % Active visualisation: initial new point   
-		
+
         % Metropolis acceptance criteria for new point
         thres = rand(1);
-		a     = min([1 exp(-(logPNew-logP)/opts.T)]);
+		a     = min([1 exp(-(logPNew-runVar.logP)/opts.T)]);
         if a > thres
-            pt = ptTest;
-            logP = logPNew;
+            runVar.pt = ptTest;
+            runVar.logP = logPNew;
             % Reinitialise MCMC parameters
-            opts.step = ones(size(bnd(:,1)))*opts.stepi;
+            opts.step = ones(size(runVar.bnd(:,1)))*opts.stepi;
             if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
                 fprintf('chosen... (%7.1fs)\n',toc(t1))
 				pt_n = pt_n + 1;
@@ -257,29 +260,29 @@ while status == 1
     end
 
     %% MCMC evolution of active point
-    [pt,logP,testRes,delPt,opts] = MCMCKernel(objfun,pt,logP,bnd,opts);
-    acptCnt = [acptCnt(2:end) testRes];
-	opts = adaptFun(acptCnt,pt,delPt,opts);
+    [runVar,opts] = MCMCKernel(runVar,opts);
+    acptCnt = [acptCnt(2:end) runVar.ptTest];
+	opts = adaptFun(acptCnt,runVar,opts);
 
     %% Intermediate plotting of points (full display, only at single core mode)
     if ~opts.parMode && strcmpi(opts.disp,'full')
 		% Test Scale
-		logTest = log(bnd(:,2))-log(bnd(:,1));
+		logTest = log(runVar.bnd(:,2))-log(runVar.bnd(:,1));
 		logScale = logTest>1&imag(logTest)==0;
 		if ~logScale(1)
-			fordDirX = pt(1)+opts.basis(1)*opts.step(1);
-			RevDirX = pt(1)-opts.basis(1)*opts.step(1);
+			fordDirX = runVar.pt(1)+opts.basis(1)*opts.step(1);
+			RevDirX = runVar.pt(1)-opts.basis(1)*opts.step(1);
 		else
-			fordDirX = pt(1)*opts.basis(1)*opts.step(1);
-			RevDirX = pt(1)/(opts.basis(1)*opts.step(1));
+			fordDirX = runVar.pt(1)*opts.basis(1)*opts.step(1);
+			RevDirX = runVar.pt(1)/(opts.basis(1)*opts.step(1));
 		end
 		
 		if ~logScale(2)
-			fordDirY = pt(2)+opts.basis(2)*opts.step(2);
-			RevDirY = pt(2)-opts.basis(2)*opts.step(2);
+			fordDirY = runVar.pt(2)+opts.basis(2)*opts.step(2);
+			RevDirY = runVar.pt(2)-opts.basis(2)*opts.step(2);
 		else
-			fordDirY = pt(2)*opts.basis(2)*opts.step(2);
-			RevDirY = pt(2)/(opts.basis(2)*opts.step(2));
+			fordDirY = runVar.pt(2)*opts.basis(2)*opts.step(2);
+			RevDirY = runVar.pt(2)/(opts.basis(2)*opts.step(2));
 		end
 		
         if isempty(pltHndl)
@@ -289,17 +292,17 @@ while status == 1
 			% Draw the boundaries
 			curBasis = [opts.basis null(opts.basis')];%%%
 			if isfield(opts,'pt0')
-				pltHndl = plot(pt(1),pt(2),'x',...
-				pt(1),pt(2),'o',...
+				pltHndl = plot(runVar.pt(1),runVar.pt(2),'x',...
+				runVar.pt(1),runVar.pt(2),'o',...
 				[fordDirX RevDirX],[fordDirY RevDirY]);%%%
 			else
-				pltHndl = plot(pt(1),pt(2),'x',...
-				pt(1),pt(2),'o',...
-				[pt(1) pt(1)+opts.basis(1)*opts.step(1)],[pt(2) pt(2)+opts.basis(2)*opts.step(1)],...%%%%
-				[bnd(1,1) bnd(1,2)],[bnd(2,1) bnd(2,1)],...
-				[bnd(1,2) bnd(1,2)],[bnd(2,1) bnd(2,2)],...
-				[bnd(1,2) bnd(1,1)],[bnd(2,2) bnd(2,2)],...
-				[bnd(1,1) bnd(1,1)],[bnd(2,2) bnd(2,1)]);
+				pltHndl = plot(runVar.pt(1),runVar.pt(2),'x',...
+				runVar.pt(1),runVar.pt(2),'o',...
+				[runVar.pt(1) runVar.pt(1)+opts.basis(1)*opts.step(1)],[runVar.pt(2) runVar.pt(2)+opts.basis(2)*opts.step(1)],...%%%%
+				[runVar.bnd(1,1) runVar.bnd(1,2)],[runVar.bnd(2,1) runVar.bnd(2,1)],...
+				[runVar.bnd(1,2) runVar.bnd(1,2)],[runVar.bnd(2,1) runVar.bnd(2,2)],...
+				[runVar.bnd(1,2) runVar.bnd(1,1)],[runVar.bnd(2,2) runVar.bnd(2,2)],...
+				[runVar.bnd(1,1) runVar.bnd(1,1)],[runVar.bnd(2,2) runVar.bnd(2,1)]);
 			end
 			if logScale(1)
 				set(gca,'XScale','log')
@@ -309,7 +312,7 @@ while status == 1
 			end
 			% Other diagnostic plots
             subplot(2,2,2)
-            pltHndl2 = semilogy(1,logP/opts.T,[0 1],-log10([opts.Pmin opts.Pmin]),':');
+            pltHndl2 = semilogy(1,runVar.logP/opts.T,[0 1],-log10([opts.Pmin opts.Pmin]),':');
  			subplot(2,2,4)
 			pltHndl3 = plot(1,sqrt(sum(opts.step.^2)));
         else
@@ -317,12 +320,12 @@ while status == 1
 			xlabel('Param 1')
 			ylabel('Param 2')
 			title(['Pts saved = ' num2str(pt_uniQ_n,'%d')])
-            set(pltHndl(1),'XData',[get(pltHndl(1),'XData') pt(1)],'YData',[get(pltHndl(1),'YData') pt(2)])
+            set(pltHndl(1),'XData',[get(pltHndl(1),'XData') runVar.pt(1)],'YData',[get(pltHndl(1),'YData') runVar.pt(2)])
             n   = get(pltHndl3(1),'XData');
-            set(pltHndl(2),'XData',pt(1),'YData',pt(2))
+            set(pltHndl(2),'XData',runVar.pt(1),'YData',runVar.pt(2))
 			curBasis = [opts.basis null(opts.basis')];
 			set(pltHndl(3),'XData',[fordDirX RevDirX],'YData',[fordDirY RevDirY])
-			set(pltHndl2(1),'XData',[n n(end)+1],'YData',[get(pltHndl2(1),'YData') logP/opts.T])
+			set(pltHndl2(1),'XData',[n n(end)+1],'YData',[get(pltHndl2(1),'YData') runVar.logP/opts.T])
 			set(pltHndl2(2),'XData',[0 n(end)+1])
  			set(pltHndl3,'XData',[n n(end)+1],'YData',[get(pltHndl3,'YData') sqrt(sum(opts.step.^2))])		
 			drawnow
@@ -331,29 +334,18 @@ while status == 1
 	
 	%% Point storage
     %Acceptance criteria for storing of active point
-    if logP/opts.T <= -log(opts.Pmin)
-        if testRes
+    if runVar.logP/opts.T <= -log(opts.Pmin)
+        if runVar.ptTest
             pt_uniQ_n = pt_uniQ_n + 1;
 %             if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx==1
 %                 disp(pt_uniQ_n+1)
 %             end
-        end
+		end
         pt_n = pt_n + 1;
-        logPLocal(pt_n) = logP;
-        ptLocal(pt_n,:) = pt;
+        logPLocal(pt_n) = runVar.logP;
+        ptLocal(pt_n,:) = runVar.pt;
         t2 = tic;
         stallWarn = 0;
-	end
-	
-	%% Program escape
-    % Exit clause for other labs
-    if opts.parMode && labindx ~= 1
-        if labProbe(1,2)
-            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindex==1
-                fprintf('Exit signal received. Quitting.\n\r');
-            end
-            status = labReceive(1,2);
-        end
 	end
 	
     %% Parallel mode packet send and receive
@@ -379,6 +371,7 @@ while status == 1
             logPLocal = nan(size(logPLocal));
             ptLocal = nan(size(ptLocal));
             pt_n = 0;
+			pt_uniQ_n = 0;
             if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text'))
                 fprintf('Data packet sent.\n\r');
             end
@@ -400,8 +393,19 @@ while status == 1
             end
             status = 0;
         end
-    end
+	end
 
+	%% Program escape
+    % Exit clause for other labs
+    if opts.parMode && labindx ~= 1
+        if labProbe(1,2)
+            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindex==1
+                fprintf('Exit signal received. Quitting.\n\r');
+            end
+            status = labReceive(1,2);
+        end
+	end
+	
     %% Stall handling
     if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10)
         stallWarn = stallWarn + 1;
@@ -429,9 +433,6 @@ end
 
 %% Run completion
 if opts.parMode
-	if strcmpi(opts.disp,'full')
-		fclose(h);
-	end
 labBarrier
 end
 
@@ -450,16 +451,19 @@ end
 %%%%%%%% Sub function starts below %%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [pt,logP,ptTest,delPt,opts] = MCMCKernel(objfun,pt0,logP0,bnd,opts)
+function [runVar,opts] = MCMCKernel(runVar,opts)
 
 % MCMCKernel generates and tests the new point point using the hasting
 % ratio for MCMC. Point proposal is conducted
 
+pt0 = runVar.pt;
+logP0 = runVar.logP;
+
 % Generate next point
-[pt1,pdfBias] = opts.propDis(pt0,bnd,opts);
+[pt1,pdfBias] = opts.propDis(pt0,runVar.bnd,opts);
 
 %Check point still in boundary
-if sum(pt1 < bnd(:,1)) || sum(pt1 > bnd(:,2))
+if sum(pt1 < runVar.bnd(:,1)) || sum(pt1 > runVar.bnd(:,2))
 	error('MCMC:boundaryBreached','The program ran outside the boundary. Likely to be a bug in the proposal distribution')
 end
 
@@ -470,34 +474,34 @@ end
 if ~isrow(pt0)
 	pt0 = pt0';
 end
-logP1 = objfun(pt1);      % Obtain likelihood of proposed step
+logP1 = runVar.obj(pt1);      % Obtain likelihood of proposed step
 
 % Metropolis Algorithm
 test = min([1 exp((logP0-logP1)/opts.T)/pdfBias]); % Calculate hastings term.
-										  % To make metropolis, set pdfBias
-										  % to one in your proposal
-										  % distribution function.
+														  % To make metropolis, set pdfBias
+														  % to one in your proposal
+														  % distribution function.
 
 thres = rand(1);   % Randomise threshold
 
-ptTest = thres < test;
+runVar.ptTest = thres < test;
 
 %ABC Rejection when less than threshold
 
 absthres = 1;
 if logP1 < absthres
-	ptTest = true;
+	runVar.ptTest = true;
 end
 
-if ptTest
-	pt = pt1;
-	logP = logP1;
+if runVar.ptTest
+	runVar.pt = pt1;
+	runVar.logP = logP1;
 else
-	pt = pt0;
-	logP = logP0;
+	runVar.pt = pt0;
+	runVar.logP = logP0;
 end
 try
-	delPt = pt1-pt0;
+	runVar.delPt = pt1-pt0;
 catch
 	keyboard
 end

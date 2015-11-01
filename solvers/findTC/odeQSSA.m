@@ -14,7 +14,7 @@ Names = ['p       '
          'inp     '
          '-r      '
          'r       '
-		 'x0      '
+		 'y0      '
 		 'odeopts '
 		 'rd      '
 		 '-b      '];
@@ -59,10 +59,15 @@ for ii = 1:length(varargin)
 end
 
 %% Compile model if new one inserted
-if isempty(p)
-	[k0,k1,k2,G,model] = prepareTensor(model);
+if ~isstruct(model)
+	model = parseModel(model,p);
 else
-	[k0,k1,k2,G,model] = prepareTensor(model,p);
+	if ~isempty(p)
+		if isrow(p)
+			p = p';
+		end
+		model = model.rxnRules('insParam',model,p);
+	end
 end
 
 % %Correct dimension of x0 and tspan
@@ -149,17 +154,12 @@ end
 	
 %% From here on in, all time is non-dimensionalised, as ode will be run from t = 0 to 1.
 % Non-dimensionalise.
-k0 = k0*(tspan(end)-tspan(1));
-k1 = k1*(tspan(end)-tspan(1));
-k2(:,end) = k2(:,end)*(tspan(end)-tspan(1));
-
 normFac = 1/trapz(linspace(0,1,10000),normpdf(linspace(0,1,10000),0,0.2));
 %Normalisation factor which makes sure the ramp in will ramp in the full
 %amount after the run time.
-normInp = @(t) [inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1))]; %time shift and non-dimensionalise inp;
+normInp = @(t) inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1)); %time shift and non-dimensionalise inp;
 
-basalSigma = @(t) k0*ones(1,length(t)); 
-fullSigma = @(t) normInp(t) + k0*ones(1,length(t)); 
+model = model.rxnRules('nondim',model,tspan,normInp);
 
 %ODE Solver options and warning
 if ~exist('options','var')
@@ -170,8 +170,10 @@ warnstate('error')
 %% Solving
 % Ramping
 if ramp && basal
-	rampSigma = @(t) x0*normFac*normpdf(t,0,0.2);
-	dx_dt = @(t,x) dynEqn(t,x,G,rampSigma,k1*0,zeros(0,4));
+	modelRB = model;
+	modelRB.k0 = @(t) x0*normFac*normpdf(t,0,0.2);
+	modelRB = model.rxnRules('ramp',modelRB);
+	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelRB);
 	[t,Y] = ode45(dx_dt,[0 1],x0*0,options);
 	x0 = Y(end,:)';
 end
@@ -179,7 +181,9 @@ end
 % Solve Basal Condition
 if basal && ~rampOnly
 	%Run
-	dx_dt = @(t,x) dynEqn(t,x,G,basalSigma,k1,k2);
+	modelB = model;
+	modelB.k0 = model.basalSigma;
+	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelB);
 	converge = false;
 	ii = 1;
 	while ~converge
@@ -192,8 +196,10 @@ end
 
 % Ramping
 if ramp
-	rampSigma = @(t) (inpConst + x0)*normFac*normpdf(t,0,0.2);
-	dx_dt = @(t,x) dynEqn(t,x,G,rampSigma,k1*0,zeros(0,4));
+	modelR = model;
+	modelR.k0 = @(t) (inpConst + x0)*normFac*normpdf(t,0,0.2);
+	modelR = model.rxnRules('ramp',modelR);
+	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelR);
 	[t,Y] = ode45(dx_dt,[0 1],x0*0,options);
 	x0 = Y(end,:);
 end
@@ -201,7 +207,8 @@ end
 % Solve ODE
 if ~rampOnly
 	%Run
-	dx_dt = @(t,x) dynEqn(t,x,G,fullSigma,k1,k2);
+	model.k0 = model.fullSigma;
+	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,model);
 	[t,Y] = ode15s(dx_dt,[0 1],x0,options);
 end
 t = t*(tspan(end)-tspan(1))+tspan(1); %Restore to original units
