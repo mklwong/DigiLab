@@ -220,12 +220,12 @@ switch rxnType
 			paramDesc = {['kc_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['Km_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['n_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-			tensVal   = {[subIndx  enzIndx subIndx -k*overlap*subVec;
-						 prodIndx  enzIndx subIndx  k*overlap*prodVec];
-						 [subIndx  enzIndx subIndx Km;
-						 prodIndx  enzIndx subIndx Km];
-						  [subIndx enzIndx subIndx  n;
-						 prodIndx  enzIndx subIndx  n];};
+			tensVal   = {[subIndx  subIndx enzIndx -k*overlap*subVec;
+						 prodIndx  subIndx enzIndx  k*overlap*prodVec];
+						 [subIndx  subIndx enzIndx Km;
+						 prodIndx  subIndx enzIndx Km];
+						  [subIndx subIndx enzIndx  n;
+						 prodIndx  subIndx enzIndx  n];};
 end
 varargout = {reqTens,tensVal,paramDesc,x};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -305,10 +305,18 @@ M = zeros(size(model.tensor.k1));
 L = M;
 hillTerm = M;
 compVal = model.conc.comp;
+
+% Make compartment size never infinite. If it is, make it 1 million times
+% larger.
+indx = isinf(compVal);
+compVal(indx) = 0;
+compVal(indx) = max(compVal)*1e6;
+
 sourceComp = compVal';
 sourceComp = sourceComp(ones(1,length(compVal)),:);
 
-model.param(5).tens(:,4) = model.param(5).tens(:,4).*compVal(model.param(5).tens(:,3)).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
+%% Tensor construction
+model.param(5).tens(:,4) = model.param(5).tens(:,4).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
 
 MTmp = sparse(model.param(1).tens(:,1),model.param(1).tens(:,3),x(model.param(1).tens(:,2))./model.param(1).tens(:,4));
 [a,b] = size(MTmp);
@@ -323,8 +331,9 @@ hillTmp = sparse(model.param(5).tens(:,1),model.param(5).tens(:,2),model.param(5
 [a,b] = size(hillTmp);
 hillTerm(1:a,1:b) = hillTmp;
 
+%% Solve
 try
-	varargout{1} = ((eye(length(x))+M)\(L*x+(model.tensor.k1.*sourceComp)*x+model.k0(t).*compVal+hillTerm*x))./compVal;
+	varargout{1} = ((eye(length(x))+M)\(L*x+(model.tensor.k1.*sourceCompk1)*x+model.k0(t).*compVal+hillTerm*x))./compVal;
 catch
 	keyboard
 end
