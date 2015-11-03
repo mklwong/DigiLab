@@ -11,8 +11,8 @@ spcComp = {'Cyto', NaN;
 %
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
-modSpc = {'A'         ,'Cyto'  , 1;
-          'B'         ,'Cyto'  , 0;
+modSpc = {'A'         ,'Cyto'  , NaN;
+          'B'         ,'Cyto2' , NaN;
           'C'         ,'Cyto'  , 1};
 
 %% Relationship between simulation state and model state association
@@ -53,3 +53,8 @@ rxn(end+1).label = 'A -> B | C (Hillfun)';
     rxn(end).k   = NaN; 
 	rxn(end).Km  = NaN;
 	rxn(end).n   = NaN;
+	
+rxn(end+1).label = 'B -> A';
+    rxn(end).sub = 'B';  
+    rxn(end).prod= 'A';
+    rxn(end).k   = NaN; 

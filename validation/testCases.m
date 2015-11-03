@@ -85,9 +85,9 @@ resid(10) = sum(YReal(end,1:6)-YMod(end,1:6));
 
 % Hill Function
 method = 'hillFun';
-x0 = [1 0 10 0 0 0 0];
+x0 = [1 0 1000 0 0 0 0];
 k = [1 1 1 1 1 1 ];
-v = [1 1];
+v = [2 1];
 [tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k,v),[0 10],x0);
 [tMod,~,YMod] = findTC(@hillFun,tReal,'p',[v k],'y0',x0(1:3),'-b');
 resid(11) = sum(YReal(end,1)-YMod(end,1));

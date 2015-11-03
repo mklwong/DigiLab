@@ -59,16 +59,14 @@ for ii = 1:length(varargin)
 end
 
 %% Compile model if new one inserted
+if isrow(p)
+	p = p';
+end
+
 if ~isstruct(model)
 	model = parseModel(model,p);
-else
-	if ~isempty(p)
-		if isrow(p)
-			p = p';
-		end
-		model = model.rxnRules('insParam',model,p);
-	end
 end
+model = model.rxnRules('insParam',model,p);
 
 % %Correct dimension of x0 and tspan
 if isrow(x0)
