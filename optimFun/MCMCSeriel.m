@@ -46,11 +46,18 @@ end
 modelLoc(end-length(modName)-1:end) = [];
 
 % Load prior file (if exists)
-if isempty(prirDat)
+if isempty(prirDat) || ~exist('result','var')
     fprintf('No prior given.\n')
+    prir = struct();
+    prir.logP = [];
+    prir.pts  = [];
+    prir.T    = 1;
 elseif exist([modelLoc prirDat],'file') == 2
     load([modelLoc prirDat]); % Load prior file
     fprintf('prior file Loaded.\n')
+elseif ~exist('result','var')
+    prir = result;
+	fprintf('prior entered from workspace.\n')
 else
 	keyboard
 	error('Specified prior not found')
@@ -67,17 +74,6 @@ rng('shuffle'); %shuffle the random generator
 runID = [num2str(c(3)) '-' num2str(c(2)) '_' sysName '_' symChar(randi(length(symChar),1,5))]; %random string of 5
 if ~exist([modelLoc '/' runID],'file')
 	mkdir(modelLoc,runID);                       %Make subdirectory
-end
-
-% If no prior, initialise.
-if ~exist('result','var')
-    prir = struct();
-    prir.logP = [];
-    prir.pts  = [];
-    prir.T    = 1;
-else
-    prir = result;
-	fprintf('prior entered.\n')
 end
 
 %Determine Scheduler by power factor x^n. The stps-1 is because the last value
@@ -143,7 +139,9 @@ while ii ~= length(T)+1
 	result.T     = T(ii);
 	result.model = model;
 	result.best  = pts(logP==min(logP),:);
-	result.obj   = U;
+    if exist('U','var')
+        result.obj   = U;
+    end
     save([modelLoc runID '/' fileName],'result');
     fileLocs{ii} = fileName;
 

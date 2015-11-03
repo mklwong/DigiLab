@@ -44,7 +44,11 @@ end
 
 %== Process parallel computing ==%
 if opts.parMode
-    parRes = parComp('open');
+    if ~islogical(opts.parMode)
+        parRes = parComp('open',opts.parMode);
+    else
+        parRes = parComp('open');
+    end
 	if parRes == -1
 		opts.parMode = false;
 	end
@@ -139,16 +143,18 @@ if ~isempty(opts.prior)
 	% Turn objective score into PDF and then CDF for prior
 	[priorP,I] = sort(exp(-priorLogP));
 	priorPts = priorPts(I,:);
-	%priorLogP = priorLogP(I);
+	priorLogP = priorLogP(I);
 	priorP = cumsum(priorP);
 	% Remove low probability points
 	rmPts = priorP<(1e-4*max(priorP));	
 	priorP(rmPts) = [];
-	%priorLogP(rmPts) = [];
+	priorLogP(rmPts) = [];
 	priorPts(rmPts,:) = [];
 	% Normalise CDF to 1
+    runVar.prior.logP = priorLogP;
+    runVar.prior.pts = priorPts;
 	runVar.priorP = priorP/max(priorP);
-	clear dupIndx rmPts priorLogP priorPts
+	clear dupIndx rmPts priorLogP priorPts priorP
 end
 
 %% Initialisation
@@ -203,16 +209,20 @@ while status == 1
         if ~isempty(opts.prior.pts)
 			% Select new point from prior based on goodness of fit of the
 			% prior
-			fprintf('Selected randomly from prior\n')
+            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
+                fprintf('Selected randomly from prior\n')
+            end
             rngPt = rand(1);
-			newPtInd = ceil(interp1([0;priorP],0:length(priorP),rngPt));
+			newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
             ptTest = opts.prior.pts(newPtInd,:);
 			logPNew  = runVar.obj(ptTest);
 		elseif isfield(opts,'pt0')
 			% If only a single prior point is given, do not jump around the
 			% parameter space by reseeding. Also do not put boundaries on
 			% the fitting.
-			fprintf('Selected from initial start point\n')
+            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
+                fprintf('Selected from initial start point\n')
+            end
 			ptTest = opts.pt0;
 			logPNew  = runVar.obj(ptTest);
 			opts.resample = Inf;
@@ -227,8 +237,10 @@ while status == 1
 		else
 			if sum(runVar.bnd(:,1)==0 | isinf(runVar.bnd(:,2)))
 				error('mcmc:unboundNoPrior','Cannot be run with no boundary when no prior is given')
-			end
-			fprintf('Selected randomly from within boundary\n')
+            end
+            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
+                fprintf('Selected randomly from within boundary\n')
+            end
             ptTest = rand(size(runVar.bnd,1),1).*(runVar.bnd(:,2)-runVar.bnd(:,1))+runVar.bnd(:,1);
             logPNew  = runVar.obj(ptTest);
             opts.resample = Inf;
