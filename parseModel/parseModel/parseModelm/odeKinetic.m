@@ -312,20 +312,27 @@ indx = isinf(compVal);
 compVal(indx) = 0;
 compVal(indx) = max(compVal)*1e6;
 
-sourceComp = compVal';
-sourceComp = sourceComp(ones(1,length(compVal)),:);
+% Compartment size correction for unimolecular type reactions.
+sourceCompk1 = compVal';
+sourceCompk1 = sourceCompk1(ones(1,length(compVal)),:);
+
+% Compartment size correction for bimolecular reaction. Take smaller of two
+% compartments
+sourceCompk2 = compVal';
+sourceCompk2 = sourceCompk2(ones(1,length(compVal)),:,[1 1]);
+sourceCompk2(:,:,2) = sourceCompk2(:,:,1)';
+sourceCompk2 = min(sourceCompk2,[],3);
 
 %% Tensor construction
-model.param(5).tens(:,4) = model.param(5).tens(:,4).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
+model.param(5).tens(:,4) = min(compVal(model.param(5).tens(:,2:3)),[],2).*model.param(5).tens(:,4).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
 
 MTmp = sparse(model.param(1).tens(:,1),model.param(1).tens(:,3),x(model.param(1).tens(:,2))./model.param(1).tens(:,4));
 [a,b] = size(MTmp);
 M(1:a,1:b) = MTmp;
 
-LTmp = sparse(model.param(2).tens(:,1),model.param(2).tens(:,2),model.param(2).tens(:,4).*x(model.param(2).tens(:,3)));
+LTmp = sparse(model.param(2).tens(:,1),model.param(2).tens(:,2),model.param(2).tens(:,4).*x(model.param(2).tens(:,3)).*min(compVal(model.param(2).tens(:,2:3)),[],2));
 [a,b] = size(LTmp);
 L(1:a,1:b) = LTmp;
-L = L.*sourceComp;
 
 hillTmp = sparse(model.param(5).tens(:,1),model.param(5).tens(:,2),model.param(5).tens(:,4));
 [a,b] = size(hillTmp);
