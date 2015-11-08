@@ -44,7 +44,7 @@ switch lower(deblank(mode))
                 maxWorkers = clustInfo.ClusterSize;
                 numWorkers = min([maxWorkers numWorkers]); %Make sure required workers is not more than max workers
                 if matlabpool('size')==0
-                    matlabpool('open',numWorkers);
+                    matlabpool('open');
                 else
                     fprintf('Cluster already open\n')
                 end
