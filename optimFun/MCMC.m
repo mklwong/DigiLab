@@ -207,7 +207,9 @@ while status == 1
         if ~isempty(opts.prior.pts)
 			% Select new point from prior based on goodness of fit of the
 			% prior
-			fprintf('Selected randomly from prior\n')
+			if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
+			   fprintf('Selected randomly from prior\n')
+			end
             rngPt = rand(1);
 			newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
             ptTest = opts.prior.pts(newPtInd,:);
