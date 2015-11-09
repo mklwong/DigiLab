@@ -218,7 +218,9 @@ while status == 1
 			% If only a single prior point is given, do not jump around the
 			% parameter space by reseeding. Also do not put boundaries on
 			% the fitting.
-			fprintf('Selected from initial start point\n')
+			if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
+				fprintf('Selected from initial start point\n')
+			end
 			ptTest = opts.pt0;
 			logPNew  = runVar.obj(ptTest);
 			opts.resample = Inf;
@@ -234,7 +236,9 @@ while status == 1
 			if sum(runVar.bnd(:,1)==0 | isinf(runVar.bnd(:,2)))
 				error('mcmc:unboundNoPrior','Cannot be run with no boundary when no prior is given')
 			end
-			fprintf('Selected randomly from within boundary\n')
+			if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
+				fprintf('Selected randomly from within boundary\n')
+			end
             ptTest = rand(size(runVar.bnd,1),1).*(runVar.bnd(:,2)-runVar.bnd(:,1))+runVar.bnd(:,1);
             logPNew  = runVar.obj(ptTest);
             opts.resample = Inf;
