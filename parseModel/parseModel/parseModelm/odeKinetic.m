@@ -339,10 +339,7 @@ hillTmp = sparse(model.param(5).tens(:,1),model.param(5).tens(:,2),model.param(5
 hillTerm(1:a,1:b) = hillTmp;
 
 %% Solve
-try
-	varargout{1} = ((eye(length(x))+M)\(L*x+(model.tensor.k1.*sourceCompk1)*x+model.k0(t).*compVal+hillTerm*x))./compVal;
-catch
-	keyboard
-end
+varargout{1} = ((eye(length(x))+M)\(L*x+(model.tensor.k1.*sourceCompk1)*x+model.k0(t).*compVal+hillTerm*x))./compVal;
+
 
 end

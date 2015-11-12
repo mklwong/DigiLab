@@ -165,6 +165,7 @@ if ~exist('options','var')
 end
 warnstate('error')
 
+try
 %% Solving
 % Ramping
 if ramp && basal
@@ -214,7 +215,13 @@ if length(tspan)>2
 	Y = interp1(t,Y,tspan);
 	t = tspan;
 end
-
+catch errMsg
+	Y = Y*0;
+	Y = interp1(t,Y,tspan);
+	t = tspan;
+	storeError(model,x0,p,errMsg,errMsg.message)
+	return
+end
 YComp  = Y;
 Y = compDis(model,Y);      %dissociate complex
 
