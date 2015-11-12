@@ -57,12 +57,12 @@ end
 %== Add initial points and functions into optimisation settings ==%
 if ~isempty(pt0)
 	if isrow(pt0)
-		opts.pt0 = pt0;
+		runVar.pt0 = pt0;
 	else
-		opts.pt0 = pt0';
+		runVar.pt0 = pt0';
 	end
-	if sum(double(opts.pt0<bnd(:,1)' | opts.pt0>bnd(:,2)'))
-		find(double(opts.pt0<bnd(:,1)' | opts.pt0>bnd(:,2)'))
+	if sum(double(runVar.pt0<bnd(:,1)' | runVar.pt0>bnd(:,2)'))
+		find(double(runVar.pt0<bnd(:,1)' | runVar.pt0>bnd(:,2)'))
 		error('MCMC:InitialPointOutOfBound','Initial point is outside the required boundary.')
 	end
 end
@@ -221,7 +221,7 @@ while status == 1
 			if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
 				fprintf('Selected from initial start point\n')
 			end
-			ptTest = opts.pt0;
+			ptTest = runVar.pt0;
 			logPNew  = runVar.obj(ptTest);
 			opts.resample = Inf;
 			% Remove boundaries of the run, because with only one seed
