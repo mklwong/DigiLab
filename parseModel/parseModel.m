@@ -16,6 +16,9 @@ expComp = true;
 if ischar(modelname)
 	model.name = modelname;
 	model.rxnRules = @odeKinetic;
+elseif isa(modelname,'function_handle')
+	model.name = func2str(modelname);
+	model.rxnRules = @odeKinetic;
 else
 	model = modelname;
 end
