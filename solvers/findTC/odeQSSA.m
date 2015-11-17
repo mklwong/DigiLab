@@ -1,4 +1,4 @@
-function [t,Y,YComp] = odeQSSA(model,tspan,varargin)
+function [t,Y,YComp] = odeQSSA(modelRaw,tspan,varargin)
 %
 % odeQSSA
 %
@@ -63,10 +63,10 @@ if isrow(p)
 	p = p';
 end
 
-if ~isstruct(model)
-	model = parseModel(model,p);
+if ~isstruct(modelRaw)
+	modelRaw = parseModel(modelRaw,p);
 end
-model = model.rxnRules('insParam',model,p);
+model = modelRaw.rxnRules('insParam',modelRaw,p);
 
 % %Correct dimension of x0 and tspan
 if isrow(x0)
@@ -184,7 +184,7 @@ if basal && ~rampOnly
 	modelB.k0 = model.basalSigma;
 	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelB);
 	converge = false;
-	ii = 1;
+	ii = 0;
 	while ~converge
 		[t,Y] = ode15s(dx_dt,[0 2^ii],x0,options);
 		ii = ii + 1;
@@ -219,7 +219,7 @@ catch errMsg
 	Y = Y*0;
 	Y = interp1(t,Y,tspan);
 	t = tspan;
-	storeError(model,x0,p,errMsg,errMsg.message)
+	storeError(modelRaw,x0,p,errMsg,errMsg.message)
 	return
 end
 YComp  = Y;

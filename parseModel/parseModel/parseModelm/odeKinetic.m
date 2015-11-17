@@ -299,7 +299,7 @@ case 'dyneqn'
 %Required outputs are [dx_dt]
 
 [t,x,model] = varargin{:};
-x(x<0) = 0; %sometimes the system goes to less than zero. When it wants to do this, set it to zero
+%x(x<0) = 0; %sometimes the system goes to less than zero. When it wants to do this, set it to zero
 
 M = zeros(size(model.tensor.k1));
 L = M;
@@ -310,18 +310,11 @@ compVal = model.conc.comp;
 % larger.
 indx = isinf(compVal);
 compVal(indx) = 0;
-compVal(indx) = max(compVal)*1e6;
+compVal(indx) = max(compVal)*1e100;
 
 % Compartment size correction for unimolecular type reactions.
 sourceCompk1 = compVal';
 sourceCompk1 = sourceCompk1(ones(1,length(compVal)),:);
-
-% Compartment size correction for bimolecular reaction. Take smaller of two
-% compartments
-sourceCompk2 = compVal';
-sourceCompk2 = sourceCompk2(ones(1,length(compVal)),:,[1 1]);
-sourceCompk2(:,:,2) = sourceCompk2(:,:,1)';
-sourceCompk2 = min(sourceCompk2,[],3);
 
 %% Tensor construction
 model.param(5).tens(:,4) = min(compVal(model.param(5).tens(:,2:3)),[],2).*model.param(5).tens(:,4).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
