@@ -1,4 +1,4 @@
-function storeError(model,x0,p,matmsg,msg)
+function storeError(model,x0,p,matmsg,msg,Errdir)
 
 % storeError(model,p,msg)
 %
@@ -10,6 +10,10 @@ function storeError(model,x0,p,matmsg,msg)
 % - The time of generation
 
 %% Extract model name
+if nargin == 6
+	dirLoc = Errdir;
+else
+
 if isfield(model,'name')
 	modName = model.name;
 	dirLoc = which(modName);
@@ -20,6 +24,7 @@ elseif ischar(model)
 else
 	modName = 'custom';
 	dirLoc = './custom';
+end
 end
 
 %% Check if directory for storage exists

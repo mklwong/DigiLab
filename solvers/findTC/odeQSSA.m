@@ -17,7 +17,8 @@ Names = ['p       '
 		 'y0      '
 		 'odeopts '
 		 'rd      '
-		 '-b      '];
+		 '-b      '
+	 'errDir'];
      
 %Initialise potental options
 p    = [];
@@ -27,10 +28,13 @@ rampOnly = false;
 rampDebug = false;
 ramp = true;
 basal = true;
+errDir = false;
 
+detectOpts = true;
 %Parse optional parameters (if any)
 for ii = 1:length(varargin)
-	if ischar(varargin{ii}) %only enter loop if varargin{ii} is a parameter
+	if detectOpts %only enter loop if varargin{ii} is a parameter
+		detectOpts = false;
 		switch lower(deblank(varargin{ii}))
 			case lower(deblank(Names(1,:)))   %Parameters
 				p = varargin{ii+1};
@@ -38,9 +42,11 @@ for ii = 1:length(varargin)
 				tmpInp = varargin{ii+1};
 			case lower(deblank(Names(3,:)))   %No initial ramping
 				ramp = false;
+				detectOpts = true;
 			case lower(deblank(Names(4,:)))   %Ramping in initial condition
 				rampOnly = true;
 				rampDebug = false;
+				detectOpts = true;
 			case lower(deblank(Names(5,:)))
 				x0 = varargin{ii+1};
 			case lower(deblank(Names(6,:)))
@@ -48,13 +54,19 @@ for ii = 1:length(varargin)
 			case lower(deblank(Names(7,:)))   %Ramping in initial condition and debug (see ramping time course)
 				rampOnly = true;
 				rampDebug = true;
+				detectOpts = true;
 			case lower(deblank(Names(8,:)))   %No basal (for running faster)
 				basal = false;
+				detectOpts = true;
+			case lower(deblank(Names(9,:)))   %No basal (for running faster)
+				errDir = varargin{ii+1};
 			case []
 				error('Expecting Option String in input');
 			otherwise
 				error('Non-existent option selected. Check spelling.')
 		end
+	else
+	        detectOpts = true;
 	end
 end
 
@@ -219,8 +231,11 @@ catch errMsg
 	Y = Y*0;
 	Y = interp1(t,Y,tspan);
 	t = tspan;
-	storeError(modelRaw,x0,p,errMsg,errMsg.message)
-	return
+	if errDir 
+		storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
+	else
+		storeError(modelRaw,x0,p,errMsg,errMsg.message)
+	end
 end
 YComp  = Y;
 Y = compDis(model,Y);      %dissociate complex
