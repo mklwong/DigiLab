@@ -13,8 +13,12 @@ Names = ['expComp ';
 
 % Default options
 expComp = true;
-model.name = modelname;
-model.rxnRules = @odeKinetic;
+if ischar(modelname)
+	model.name = modelname;
+	model.rxnRules = @odeKinetic;
+else
+	model = modelname;
+end
 	 
 if ~exist('p')
 	p = [];
@@ -50,6 +54,10 @@ if strcmp(modType,'ode15s')
 elseif strcmp(modType,'QSSA')
 	if isa(model.name,'function_handle')
 		model.name = func2str(model.name);
+	elseif isstruct(model) %if model is already a structure, then do some cursory checks to see if model is already built. If so then quit
+		if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'conc') && isfield(model,'pFit') && isfield(model,'param')
+			return
+		end
 	end
 
 	% Parsing models

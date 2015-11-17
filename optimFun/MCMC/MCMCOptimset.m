@@ -29,7 +29,10 @@ Names = ['PtNo     ' %number of points to store  | defaults at 10,000
          'Pmin     ' %value less than one        | defaults to 0
 		 'AcptRto  ' %Acceptance ratio before    | defaults to 0.5
 		             %changing step size
-         'display  ' %iter, text or off          | defaults to text
+         'display  ' %full, text, track or off   | defaults to text
+					 %*full displays plot and all|
+					 % outputs                   |
+					 %*text displays
 		 'DispInt  ' %display interval: number of| defaults to 10
 		             %times the program prints   |
 				 	 %a completion percentage    | 
@@ -48,7 +51,8 @@ Names = ['PtNo     ' %number of points to store  | defaults at 10,000
 					 %point (new point chosen    |
 					 %subject to metropolis      |
 					 %algorithm).                |
-		 'maxStep  '  %Maximum step size          | defaults at 1
+		 'maxStep  ' %Maximum step size          | defaults at 1
+		 'dir      ' %String for output location | defaults at blank
 		 ];         
      
 %===============================%
@@ -73,18 +77,20 @@ opts.passNo    = 500;
 opts.resample  = 50;
 opts.adaptFun  = @adaptStep;
 opts.maxStep   = 1;
+opts.dir       = '';
 
 %========================%
 %== Construct new opts ==%
 %========================%
-
+detectOpts = true;
 for ii = 1:length(varargin)
 	if ii == 1
 		if isstruct(varargin{1})
 			opts = varargin{1};
 		end
 	end
-	if ischar(varargin{ii})
+	if ischar(varargin{ii}) && detectOpts
+		detectOpts = false;
 		switch lower(varargin{ii})
 			case lower(deblank(Names(1,:)))    %ptNo
 				opts.ptNo = varargin{ii+1};
@@ -116,13 +122,14 @@ for ii = 1:length(varargin)
 				opts.resample = varargin{ii+1};
 			case lower(deblank(Names(15,:)))   %max step
 				opts.maxStep = varargin{ii+1};
-			case 'full'
-			case 'on'
-			case 'off'
-			case 'text'
+			case lower(deblank(Names(16,:)))   %max step
+				opts.dir = varargin{ii+1};
             otherwise
 				warning('MCMCoptimset:unknowninput',['Input options ' num2str(ii) ' is non-existent. Check spelling.'])
+					
 		end
+	else
+		detectOpts = true;
 	end
 end
 

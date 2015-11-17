@@ -273,7 +273,7 @@ while status == 1
     [runVar,opts] = MCMCKernel(runVar,opts);
     acptCnt = [acptCnt(2:end) runVar.ptTest];
 	opts = adaptFun(acptCnt,runVar,opts);
-
+	
     %% Intermediate plotting of points (full display, only at single core mode)
     if ~opts.parMode && strcmpi(opts.disp,'full')
 		% Test Scale
@@ -356,6 +356,19 @@ while status == 1
         ptLocal(pt_n,:) = runVar.pt;
         t2 = tic;
         stallWarn = 0;
+	end
+	
+	%% Tracking Mode
+	if strcmpi(opts.disp,'track')
+		tNow = clock;
+		outputName = [opts.dir '\Output-Slave ' num2str(1) '.txt'];
+		if exist(outputName,'file')
+			a = fopen(outputName,'r+');
+		else
+			a = fopen(outputName,'w');
+		end
+		fprintf(a,'number of points: %1.0f. %1.0f time elapsed | Time = %2.0f:%2.0f:%2.0f \n',pt_uniQ_n,toc(t1),tNow(4:6));
+		fclose(a);
 	end
 	
     %% Parallel mode packet send and receive
@@ -510,9 +523,7 @@ else
 	runVar.pt = pt0;
 	runVar.logP = logP0;
 end
-try
-	runVar.delPt = pt1-pt0;
-catch
-	keyboard
-end
+
+runVar.delPt = pt1-pt0;
+
 end

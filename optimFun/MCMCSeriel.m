@@ -98,15 +98,14 @@ fprintf('%6.2f  ',T)
 fprintf('\n')
 
 % Parse Model
-model = parseModel(model,p);
+model = parseModel(model);
 if ~exist('objFun')
 	objFun = @(p) modelObjective(model,p,U);
 end
-if exist('opts','var')
-	opts = MCMCOptimset(opts,'Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo);
-else
-	opts = MCMCOptimset('Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo);
+if ~exist('opts','var')
+	opts = MCMCOptimset();
 end
+opts = MCMCOptimset(opts,'Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo,'dir',[modelLoc,runID]);
 %%=======================================================================%%
 %%=======================START RUN=======================================%%
 %%=======================================================================%%
