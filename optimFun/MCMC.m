@@ -198,11 +198,9 @@ status = 1;
 %% Tracking Mode
 if strcmpi(opts.disp,'text')
     outputName = [opts.dir '\Output-Slave ' num2str(labindex) '.txt'];
-    if exist(outputName,'file')
-        outFileHandle = fopen(outputName,'r+');
-    else
-        outFileHandle = fopen(outputName,'w');
-    end
+    outFileHandle = fopen(outputName,'a');
+    tNow = clock;
+    fprintf(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f \n\r',tNow(4:6));
     fclose(outFileHandle);
 end
 
