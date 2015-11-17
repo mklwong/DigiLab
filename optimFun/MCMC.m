@@ -143,15 +143,17 @@ if ~isempty(opts.prior)
 	% Turn objective score into PDF and then CDF for prior
 	[priorP,I] = sort(exp(-priorLogP));
 	priorPts = priorPts(I,:);
-	%priorLogP = priorLogP(I);
+	priorLogP = priorLogP(I);
 	priorP = cumsum(priorP);
 	% Remove low probability points
 	rmPts = priorP<(1e-4*max(priorP));	
 	priorP(rmPts) = [];
-	%priorLogP(rmPts) = [];
+	priorLogP(rmPts) = [];
 	priorPts(rmPts,:) = [];
 	% Normalise CDF to 1
 	runVar.priorP = priorP/max(priorP);
+    opts.prior.pts = priorPts;
+    opts.prior.logP = priorLogP;
 	clear dupIndx rmPts priorLogP priorPts priorP
 end
 
@@ -192,24 +194,26 @@ pt_uniQ_n = 0; %Counter for unique points.
 
 % Markov Chain started below.
 status = 1;
+
+%% Tracking Mode
+if strcmpi(opts.disp,'text')
+    outputName = [opts.dir '\Output-Slave ' num2str(labindex) '.txt'];
+    if exist(outputName,'file')
+        outFileHandle = fopen(outputName,'r+');
+    else
+        outFileHandle = fopen(outputName,'w');
+    end
+    fclose(outFileHandle);
+end
+
 %% Start loop
 while status == 1
 	
     %% New active point selection
     if mod(pt_n,opts.resample)==0 || ~isfield(runVar,'pt')
-		if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
-            fprintf('New starting point...\n')
-            if isfield(runVar,'pt')
-                fprintf('Existing point:  ')
-                fprintf('%4.2e\n',runVar.logP)
-			end
-		end
         if ~isempty(opts.prior.pts)
 			% Select new point from prior based on goodness of fit of the
 			% prior
-			if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
-			   fprintf('Selected randomly from prior\n')
-			end
             rngPt = rand(1);
 			newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
             ptTest = opts.prior.pts(newPtInd,:);
@@ -218,9 +222,6 @@ while status == 1
 			% If only a single prior point is given, do not jump around the
 			% parameter space by reseeding. Also do not put boundaries on
 			% the fitting.
-			if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
-				fprintf('Selected from initial start point\n')
-			end
 			ptTest = runVar.pt0;
 			logPNew  = runVar.obj(ptTest);
 			opts.resample = Inf;
@@ -235,19 +236,11 @@ while status == 1
 		else
 			if sum(runVar.bnd(:,1)==0 | isinf(runVar.bnd(:,2)))
 				error('mcmc:unboundNoPrior','Cannot be run with no boundary when no prior is given')
-			end
-			if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
-				fprintf('Selected randomly from within boundary\n')
-			end
+            end
             ptTest = rand(size(runVar.bnd,1),1).*(runVar.bnd(:,2)-runVar.bnd(:,1))+runVar.bnd(:,1);
             logPNew  = runVar.obj(ptTest);
             opts.resample = Inf;
         end % New candidate point
-		
-        if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
-            fprintf('Candidate point: ')
-            fprintf('%4.2e \n',logPNew)
-        end % Active visualisation: initial new point   
 
         % Metropolis acceptance criteria for new point
         thres = rand(1);
@@ -257,15 +250,7 @@ while status == 1
             runVar.logP = logPNew;
             % Reinitialise MCMC parameters
             opts.step = ones(size(runVar.bnd(:,1)))*opts.stepi;
-            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx == 1
-                fprintf('chosen... (%7.1fs)\n',toc(t1))
-				pt_n = pt_n + 1;
-            end % Active visualisation: new point chosen
-        else
-            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text'))  && labindx == 1
-                fprintf('rejected... (%7.1fs)\n',toc(t1))
-            end % Active visualisation: old point retained
-		end
+        end
 		
     end
 
@@ -347,29 +332,13 @@ while status == 1
     if runVar.logP/opts.T <= -log(opts.Pmin)
         if runVar.ptTest
             pt_uniQ_n = pt_uniQ_n + 1;
-%             if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindx==1
-%                 disp(pt_uniQ_n+1)
-%             end
-		end
+        end
         pt_n = pt_n + 1;
         logPLocal(pt_n) = runVar.logP;
         ptLocal(pt_n,:) = runVar.pt;
         t2 = tic;
         stallWarn = 0;
-	end
-	
-	%% Tracking Mode
-	if strcmpi(opts.disp,'track')
-		tNow = clock;
-		outputName = [opts.dir '\Output-Slave ' num2str(1) '.txt'];
-		if exist(outputName,'file')
-			a = fopen(outputName,'r+');
-		else
-			a = fopen(outputName,'w');
-		end
-		fprintf(a,'number of points: %1.0f. %1.0f time elapsed | Time = %2.0f:%2.0f:%2.0f \n',pt_uniQ_n,toc(t1),tNow(4:6));
-		fclose(a);
-	end
+    end
 	
     %% Parallel mode packet send and receive
     if opts.parMode
@@ -385,8 +354,9 @@ while status == 1
                 ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
                 logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
                 pt_n = pt_n+pt_n_Get;
-                if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindex==1
-                    fprintf('Data packet received (pt_n = %d).\n\r',slave_pt_uniQ_n);
+                if ~strcmpi(opts.disp,'off')
+                    tNow = clock;
+                    fprintf(outFileHandle,'Data packet received (pt_n = %d). | (%2.0f:%2.0f:%2.0f) \n\r',slave_pt_uniQ_n,tNow(4:6));
                 end
             end
         elseif labindx > 1 && pt_uniQ_n == ptNoMax
@@ -395,8 +365,9 @@ while status == 1
             ptLocal = nan(size(ptLocal));
             pt_n = 0;
 			pt_uniQ_n = 0;
-            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text'))
-                fprintf('Data packet sent.\n\r');
+            if ~strcmpi(opts.disp,'off')
+                tNow = clock;
+                fprintf(outFileHandle,'Data packet sent.  | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
             end
         end %when packet full, send
     end
@@ -405,47 +376,44 @@ while status == 1
 
     if pt_uniQ_n >= nprogress*opts.ptNo/opts.dispInt && labindx == 1
         nprogress = nprogress + 1;
-        fprintf('%3.0f%% done after %7.1f seconds.\n',(pt_uniQ_n/ptNoMax*100),toc(t1))
+        tNow = clock;
+        fprintf(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n\r',(pt_uniQ_n/ptNoMax*100),toc(t1),tNow(4:6));
         if pt_uniQ_n/ptNoMax >= 1
-            fprintf('Run complete. Quitting. \n')
+            tNow = clock;
+            fprintf(outFileHandle,'Run complete. Quitting. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
             if opts.parMode
                 labSend(0,2:numlab,2) %Send stop signal
-                if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindex==1
-                    fprintf('Exit signal sent.\n\r');
+                if ~strcmpi(opts.disp,'off')
+                    tNow = clock;
+                    fprintf(outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
                 end
             end
             status = 0;
         end
-	end
+    end
 
 	%% Program escape
     % Exit clause for other labs
     if opts.parMode && labindx ~= 1
         if labProbe(1,2)
-            if (strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')) && labindex==1
-                fprintf('Exit signal received. Quitting.\n\r');
-            end
+            tNow = clock;
+            fprintf(outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
             status = labReceive(1,2);
         end
-	end
+    end
 	
     %% Stall handling
     if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10)
         stallWarn = stallWarn + 1;
-        if labindx == 1
-            fprintf('Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)\n',stallWarn,toc(t1),toc(t2))
-            if strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')
-                fprintf('Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)\r\n',stallWarn,toc(t1),toc(t2));
-            end
-        end
+        tNow = clock;
+        fprintf(outFileHandle,'Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)  | (%2.0f:%2.0f:%2.0f) \n\r',stallWarn,toc(t1),toc(t2),tNow(4:6));
         if toc(t2)>opts.walltime*60
-            fprintf('Lab stop triggered due to taking too long...')
-            if strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')
-                fprintf('Lab stop triggered due to taking too long...');
-            end
+            tNow = clock;
+            fprintf(outFileHandle,'Lab stop triggered due to taking too long... | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
             if opts.parMode
-                if strcmpi(opts.disp,'full') || strcmpi(opts.disp,'text')
-                fprintf('Exit signal sent. Quitting.\n\r');
+                if strcmpi(opts.disp,'off')
+                    tNow = clock;
+                    fprintf(outFileHandle,'Exit signal sent. Quitting.\n\r | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
                 end
                 labSend(-1,2:numlab,2) %Send stop signal
             end
@@ -457,6 +425,10 @@ end
 %% Run completion
 if opts.parMode
 labBarrier
+end
+
+if strcmpi(opts.disp,'text')
+    fclose(outFileHandle);
 end
 
 if labindx == 1
