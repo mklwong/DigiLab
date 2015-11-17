@@ -55,9 +55,7 @@ if strcmp(modType,'ode15s')
 		model = @(t,x,p) odeFile(t,x,p);
 	end
 elseif strcmp(modType,'QSSA')
-	if isa(model.name,'function_handle')
-		model.name = func2str(model.name);
-	elseif isstruct(model) %if model is already a structure, then do some cursory checks to see if model is already built. If so then quit
+	if isstruct(model) %if model is already a structure, then do some cursory checks to see if model is already built. If so then quit
 		if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'conc') && isfield(model,'pFit') && isfield(model,'param')
 			return
 		end
