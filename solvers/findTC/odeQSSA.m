@@ -18,7 +18,7 @@ Names = ['p       '
 		 'odeopts '
 		 'rd      '
 		 '-b      '
-	 'errDir'];
+	     'errDir  '];
      
 %Initialise potental options
 p    = [];
