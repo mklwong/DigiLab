@@ -198,7 +198,7 @@ status = 1;
 %% Tracking Mode
 if strcmpi(opts.disp,'text')
     outputName = [opts.dir '\Output-Slave ' num2str(labindex) '.txt'];
-    outFileHandle = fopen(outputName,'a');
+    outFileHandle = fopen(outputName,'at');
     tNow = clock;
     fprintf(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f \n\r',tNow(4:6));
 end
@@ -256,6 +256,11 @@ while status == 1
     acptCnt = [acptCnt(2:end) runVar.ptTest];
 	opts = adaptFun(acptCnt,runVar,opts);
 	
+    if mod(floor(toc(t1))/60,10) == 0
+        tNow = clock;
+        fprintf(outFileHandle,'Time elapsed - %1.0f | Real time - %2.0f:%2.0f:%2.0f \n\r',floor(toc(t1)/60),tNow(4:6));
+    end
+    
     %% Intermediate plotting of points (full display, only at single core mode)
     if ~opts.parMode && strcmpi(opts.disp,'full')
 		% Test Scale
