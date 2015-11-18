@@ -200,6 +200,10 @@ if strcmpi(opts.disp,'text')
     outputName = [opts.dir '/Output-Slave ' num2str(labindex) '.txt'];
     outFileHandle = fopen(outputName,'at');
     tNow = clock;
+    fprintf(outFileHandle,'-------------------------------\n\r');
+    fprintf(outFileHandle,'--------Run Information--------\n\r');
+    fprintf(outFileHandle,'-------------------------------\n\r');
+    fprintf(outFileHandle,'T = %1.0f',opts.T);
     fprintf(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f \n\r',tNow(4:6));
 end
 
@@ -430,6 +434,9 @@ labBarrier
 end
 
 if strcmpi(opts.disp,'text')
+    fprintf(outFileHandle,'-------------------------------\n\r');
+    fprintf(outFileHandle,'-------------Run Ended---------\n\r');
+    fprintf(outFileHandle,'-------------------------------\n\r\n\r\n\r');
     fclose(outFileHandle);
 end
 
