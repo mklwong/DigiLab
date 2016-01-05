@@ -53,3 +53,7 @@ rxn(end+1).label = 'A -> B | C (Hillfun)';
     rxn(end).k   = NaN; 
 	rxn(end).Km  = NaN;
 	rxn(end).n   = NaN;
+rxn(end+1).label = 'B -> A';
+    rxn(end).sub = 'B';  
+    rxn(end).prod= 'A';
+    rxn(end).k   = NaN; 

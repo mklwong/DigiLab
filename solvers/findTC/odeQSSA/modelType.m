@@ -15,4 +15,6 @@ if (strcmp(msg.identifier,'MATLAB:scriptNotAFunction') || strcmp(msg.identifier,
 	modType = 'QSSA';
 elseif strcmp(msg.identifier,'MATLAB:badsubscript') || strcmp(msg.identifier,'MATLAB:maxrhs') || strcmp(msg.identifier,'MATLAB:TooManyInputs')
 	modType = 'ode15s';
+elseif strcmp(msg.identifier,'MATLAB:dispatcher:InexactCaseMatch')
+	error(msg.message)
 end
