@@ -247,12 +247,16 @@ for ii = 1:length(model.param)
 	freeInd = find(~isnan(model.param(ii).pInd));
 	% Pre-generate full matrix if possible
 	if size(model.param(ii).tens,2)==2
-		model.tensor.k0 = full(sparse(model.param(ii).tens(:,1),ones(size(model.param(ii).tens(:,1))),model.param(ii).tens(:,2)));
+		model.tensor.k0 = full(sparse(model.param(ii).tens(:,1),...
+			                          ones(size(model.param(ii).tens(:,1))),...
+									  p(model.param(ii).pInd(freeInd)).*model.param(ii).tens(:,2)));
 		if length(model.tensor.k0)~= length(x0)
 			model.tensor.k0(size(x0,1),1) = 0;
 		end
 	elseif size(model.param(ii).tens,2)==3
-		model.tensor.k1 = full(sparse(model.param(ii).tens(:,1),model.param(ii).tens(:,2),model.param(ii).tens(:,3)));
+		model.tensor.k1 = full(sparse(model.param(ii).tens(:,1),...
+			                   model.param(ii).tens(:,2),...
+							   p(model.param(ii).pInd(freeInd)).*model.param(ii).tens(:,3)));
 		if (size(model.tensor.k1,1)~= length(x0) || size(model.tensor.k1,2)~= length(x0))
 			model.tensor.k1(size(x0,1),size(x0,1)) = 0;
 		end
@@ -352,7 +356,7 @@ MMTerm(1:a,1:b) = MMTmp;
 % Solve
 try
 	%x
-varargout{1} = (eye(length(x))+M)\((L*x+(model.tensor.k1.*sourceCompk1)*x+model.k0(t).*compVal+MMTerm*x)./compVal);
+varargout{1} = (eye(length(x))+M)\((L*x+(model.tensor.k1.*sourceCompk1)*x+model.k0(t).*compVal+MMTerm*x))./compVal);
 
 catch errs
 	fprintf('error\n')
