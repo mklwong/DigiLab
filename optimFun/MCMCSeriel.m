@@ -64,7 +64,7 @@ symChar  = ['a':'z' 'A':'Z' '0':'9'];        %possible symbols
 c = clock;
 rng('shuffle'); %shuffle the random generator
 
-runID = [num2str(c(3)) '-' num2str(c(2)) '_' sysName '_' symChar(randi(length(symChar),1,5))]; %random string of 5
+runID = [num2str(c(3)) '-' num2str(c(2)) '_' num2str(c(4)) '-' num2str(c(5)) '_' sysName '_' symChar(randi(length(symChar),1,5))]; %random string of 5
 if ~exist([modelLoc '/' runID],'file')
 	mkdir(modelLoc,runID);                       %Make subdirectory
 end
