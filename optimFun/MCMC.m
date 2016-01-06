@@ -260,7 +260,7 @@ while status == 1
     acptCnt = [acptCnt(2:end) runVar.ptTest];
 	opts = adaptFun(acptCnt,runVar,opts);
 	
-    if mod(floor(toc(t1))/60,10) == 0
+    if mod(floor(toc(t1))/60,10) == 0 && strcmpi(opts.disp,'text')
         tNow = clock;
         fprintf(outFileHandle,'Time elapsed - %1.0f | Real time - %2.0f:%2.0f:%2.0f \n\r',floor(toc(t1)/60),tNow(4:6));
     end

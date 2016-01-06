@@ -105,7 +105,7 @@ end
 if ~exist('opts','var')
 	opts = MCMCOptimset();
 end
-opts = MCMCOptimset(opts,'Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo,'dir',[modelLoc,runID],'display',display);
+opts = MCMCOptimset(opts,'Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo,'dir',[modelLoc,runID],'display',disp);
 %%=======================================================================%%
 %%=======================START RUN=======================================%%
 %%=======================================================================%%

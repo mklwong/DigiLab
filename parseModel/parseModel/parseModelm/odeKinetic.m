@@ -371,13 +371,7 @@ MMTmp = sparse(model.tensor.M5(:,1),model.tensor.M5(:,2),model.tensor.M5(:,4));
 MMTerm(1:a,1:b) = MMTmp;
 
 % Solve
-try
-	%x
 varargout{1} = (eye(length(x))+M)\((L*x+(model.tensor.k1.*sourceCompk1)*x+model.k0(t).*compVal+MMTerm*x)./compVal);
 
-catch errs
-	fprintf('error\n')
-	keyboard
-end
 
 end

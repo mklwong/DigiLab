@@ -189,11 +189,11 @@ if length(tspan)>2
 	Y = interp1(t,Y,tspan);
 	t = tspan;
 end
+YComp  = Y;
 
 catch errMsg
 %% Error catching
-	Y = Y*0;
-	Y = interp1(t,Y,tspan);
+	Y = inf(length(t),length(x0));
 	t = tspan;
 	if errDir 
 		storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
@@ -201,7 +201,6 @@ catch errMsg
 		storeError(modelRaw,x0,p,errMsg,errMsg.message)
 	end
 end
-YComp  = Y;
 Y = compDis(model,Y);      %dissociate complex
 warnstate('on') %Switch warnings back to warnings
 end
