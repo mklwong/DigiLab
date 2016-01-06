@@ -190,7 +190,6 @@ if length(tspan)>2
 	t = tspan;
 end
 YComp  = Y;
-blah
 catch errMsg
 %% Error catching
 	YComp = inf(length(tspan),length(x0));
@@ -200,7 +199,6 @@ catch errMsg
 	else
 		storeError(modelRaw,x0,p,errMsg,errMsg.message)
 	end
-	keyboard
 end
 Y = compDis(model,YComp);      %dissociate complex
 warnstate('on') %Switch warnings back to warnings
