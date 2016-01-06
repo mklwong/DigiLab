@@ -193,7 +193,7 @@ YComp  = Y;
 
 catch errMsg
 %% Error catching
-	Y = inf(length(t),length(x0));
+	YComp = inf(length(tspan),length(x0));
 	t = tspan;
 	if errDir 
 		storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
@@ -201,7 +201,7 @@ catch errMsg
 		storeError(modelRaw,x0,p,errMsg,errMsg.message)
 	end
 end
-Y = compDis(model,Y);      %dissociate complex
+Y = compDis(model,YComp);      %dissociate complex
 warnstate('on') %Switch warnings back to warnings
 end
 
