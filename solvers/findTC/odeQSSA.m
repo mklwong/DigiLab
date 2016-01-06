@@ -15,7 +15,8 @@ Names = ['p       '
          '-r      '
 		 'y0      '
 		 'odeopts '
-	     'errDir  '];
+	     'errDir  '
+		 '-b      '];
      
 %Initialise potental options
 p    = [];
@@ -23,6 +24,7 @@ x0   = [];
 tmpInp  = [];
 noRamp = false;
 errDir = false;
+noBasal = false;
 
 detectOpts = true;
 %Parse optional parameters (if any)
@@ -43,6 +45,8 @@ for ii = 1:length(varargin)
 				options = varargin{ii+1};
 			case lower(deblank(Names(6,:)))   %Set directory for error output
 				errDir = varargin{ii+1};
+			case lower(deblank(Names(7,:)))   %No basal
+				noBasal = true;
 			case []
 				error('Expecting Option String in input');
 			otherwise
@@ -58,11 +62,7 @@ if isrow(p)
 	p = p';
 end
 
-%if ~isstruct(modelRaw)
-	%modelRaw = parseModel(modelRaw,ones(size(p)));
-	modelRaw = parseModel(modelRaw,p);
-%end
-model = modelRaw.rxnRules('insParam',modelRaw,p);
+model = parseModel(modelRaw,p);
 
 % %Correct dimension of x0 and tspan
 if isrow(x0)
@@ -147,8 +147,6 @@ elseif size(tmpInp,2)>2
 end
 	
 %% From here on in, all time is non-dimensionalised, as ode will be run from t = 0 to 1.
-% Non-dimensionalise.
-normFac = 1/trapz(linspace(0,1,10000),normpdf(linspace(0,1,10000),0,0.2));
 %Normalisation factor which makes sure the ramp in will ramp in the full
 %amount after the run time.
 normInp = @(t) inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1)); %time shift and non-dimensionalise inp;
@@ -166,10 +164,17 @@ try
 % Ramping
 if ~noRamp
 	modelRamp = model;
-	modelRamp.k0 = @(t) (inpConst+x0)*normFac*normpdf(t,0,0.2);
-	modelRamp = model.rxnRules('ramp',modelRamp);
+	if noBasal
+		%Do not basal the time course. Set all rate parameters to zero.
+		modelRamp.k0 = @(t) (inpConst+x0)*2*normpdf(t,0,0.2);
+		modelRamp = model.rxnRules('ramp',modelRamp);
+	else
+		%Initial basal
+		%Enter the single input at the end of the time course
+		modelRamp.k0 = @(t) x0*2*normpdf(t,0,0.2)+inpConst*2*normpdf(t,1,1e-6);
+	end
 	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelRamp);
-	[t,Y] = ode45(dx_dt,[0 1],x0*0,options);
+	[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
 	x0 = Y(end,:)';
 	x0(x0<0) = 0;
 end

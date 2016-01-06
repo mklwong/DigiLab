@@ -12,7 +12,7 @@ spcComp = {'Cyto', NaN;
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
 modSpc = {'A'         ,'Cyto'  , 1;
-          'B'         ,'Cyto'  , 0;
+          'B'         ,'Cyto2' , 0;
           'C'         ,'Cyto'  , 1};
 
 %% Relationship between simulation state and model state association

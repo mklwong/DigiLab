@@ -84,6 +84,10 @@ elseif strcmp(modType,'QSSA')
 		if isrow(p)
 			p = p';
 		end
+		p_num = size(model.pFit.lim,1);
+		if length(p)<p_num
+			error(['Insufficient number of parameters passed. ' num2str(p_num) ' is required ' num2str(length(p)) ' passed'])
+		end
 		model = model.rxnRules('insParam',model,p);
 	end
 else

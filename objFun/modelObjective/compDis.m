@@ -9,7 +9,7 @@ if ~isempty(G)
 	% concentration
 	G(G(:,1)==G(:,2) | G(:,1)==G(:,3),:)=[];
 
-	% Column 1 now contains all the complex indexes. We use onl column 2 to
+	% Column 1 now contains all the complex indexes. We use only column 2 to
 	% identify enzymes and substrates as column 3 is a duplicate. Column 4 is
 	% the Km's so we remove them.
 	G(:,[3 4]) = [];
@@ -19,8 +19,11 @@ if ~isempty(G)
 	G = G(I,:);
 
 	M = eye(size(x,1));
+	scale = model.comp.tens(model.conc.comp);
+	scale = scale(:,ones(1,length(scale)));
 	M((G(:,2)-1)*max(G(:,1))+G(:,1))=1;
-	Y = Y*M;
+	Y = Y*(M.*scale);
+	Y = Y./(scale(:,ones(1,size(Y,1))))';
 	
 	% Remove complexes
 	rmIndx = unique(G(:,1));

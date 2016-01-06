@@ -141,6 +141,12 @@ curParInd = 0;
 paramGrp = [-1,-1];
 
 % Initialise chemical species
+[a,~]     = size(spcComp);
+comp.tens    = nan(a,1);    % Compartment size
+comp.name    = cell(a,1);   % Compartment name
+comp.pInd    = nan(a,1);    % Vector showing the parameter index a free comprtment will use
+
+% Initialise chemical species
 [a,~]     = size(modSpc);
 conc.tens    = nan(a,1);    % Initial concentration
 conc.name    = cell(a,1);   % Species name
@@ -158,10 +164,11 @@ param = expandTens(param);
 
 for ii = 1:size(spcComp,1)
 	% Save Name
-	name = spcComp{ii,1};
+	comp.name(ii) = spcComp(ii,1);
 	
 	% Process parameter
     [val,freeParam,grp] = testPar(spcComp{ii,2});
+	comp.tens(ii) = val;
 	
 	parDesc = ['Comp : ' spcComp{ii,1}];
 	if freeParam
@@ -171,7 +178,7 @@ for ii = 1:size(spcComp,1)
 			custBnd = [];
 		end
 		[pFit,conc,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,conc,custBnd,Bnd.Conc,paramGrp,grp);
-		spcComp{ii,2} = p(putParInd)*val; % Save either parameter value of parameter multiplicative factor
+		comp.pInd(ii) = putParInd; % store p index of the compartment is assigned to
 	end
 end		
 
@@ -184,7 +191,7 @@ for ii = 1:a
     
     % Get compartment size for each species
 	[~,comptIndx] = intersect(upper(spcComp(:,1)),upper(modSpc{ii,2}));
-	conc.comp(ii) = spcComp{comptIndx,2};
+	conc.comp(ii) = comptIndx;
 
     % Process parameter
     [val,freeParam,grp] = testPar(modSpc{ii,3});
@@ -198,7 +205,7 @@ for ii = 1:a
 			custBnd = [];
 		end
 		[pFit,conc,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,conc,custBnd,Bnd.Conc,paramGrp,grp);
-		conc.pInd(ii) = putParInd; % store p index the variable x0 represents
+		conc.pInd(ii) = putParInd; % store p index of the x0 is assigned to
 	end
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -221,7 +228,7 @@ for ii=1:length(rxn)
     [rxn(ii).A,freeParam(4),grp(4),bnd{4}] = testPar(rxn(ii).A);
 	
 	%% Turn reactions into maths using reaction rules
-    [reqTens,tensVal,parDesc,conc] = model.rxnRules('rxnRules',rxn(ii),conc,expComp,ii);
+    [reqTens,tensVal,parDesc,conc,comptMod] = model.rxnRules('rxnRules',rxn(ii),conc,comp,expComp,ii);
 	
 	tensNames = {param.name};
 	
@@ -239,25 +246,13 @@ for ii=1:length(rxn)
 		end
 		
 		% Insert parameter indicies for free parameters
-		try
-			freeParam(jj);
-		catch
-			keyboard
-		end
 		if freeParam(jj)
-			try
 			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bnd{jj},Bnd.(reqTens{jj}),paramGrp,grp(jj));
-			catch
-				keyboard
-			end
 			param(reqIndx).pInd(appndIndx) = putParInd;               %Append parameter index
+		else
+			param(reqIndx).pInd(appndIndx) = NaN;                     %Mark no parameter needed
 		end
-
-		try
-			param(reqIndx).tens(appndIndx,:) = tensVal{jj};               %Append tensor
-		catch msg
-			printErr(msg)
-		end
+		param(reqIndx).tens(appndIndx,:) = tensVal{jj};               %Append tensor
     end
 end
 
@@ -313,6 +308,7 @@ pFit.sim2dat = dataSpc;
 model.conc = conc;
 model.pFit = pFit;
 model.param = param;
+model.comp = comp;
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%End Main Function%%%%%
