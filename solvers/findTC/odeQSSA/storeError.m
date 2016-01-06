@@ -26,6 +26,7 @@ else
 	dirLoc = './custom';
 end
 end
+dirLoc = [dirLoc '-Errors'];
 
 %% Check if directory for storage exists
 

@@ -175,14 +175,14 @@ if ~noRamp
 	end
 	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelRamp);
 	[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
-	x0 = Y(end,:)';
-	x0(x0<0) = 0;
+	y0 = Y(end,:)';
+	y0(y0<0) = 0;
 end
 
 %Run
 model.k0 = model.fullSigma;
 dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,model);
-[t,Y] = ode15s(dx_dt,[0 1],x0,options);
+[t,Y] = ode15s(dx_dt,[0 1],y0,options);
 
 t = t*(tspan(end)-tspan(1))+tspan(1); %Restore to original units
 if length(tspan)>2
@@ -190,7 +190,7 @@ if length(tspan)>2
 	t = tspan;
 end
 YComp  = Y;
-
+blah
 catch errMsg
 %% Error catching
 	YComp = inf(length(tspan),length(x0));
@@ -200,6 +200,7 @@ catch errMsg
 	else
 		storeError(modelRaw,x0,p,errMsg,errMsg.message)
 	end
+	keyboard
 end
 Y = compDis(model,YComp);      %dissociate complex
 warnstate('on') %Switch warnings back to warnings
