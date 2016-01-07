@@ -19,7 +19,7 @@ case 'ini'
 	% These are what will appear in the kinetic equation
 	
 	param(1).name = 'Km';
-	param(1).tens = nan(1,4);
+	param(1).tens = nan(1,5);
 	
 	param(2).name = 'k2';
 	param(2).tens = nan(1,4);
@@ -71,7 +71,7 @@ case 'rxnrules'
 %
 % Rate is dx_dt = param*x*x. The indices implies dx_dt(1) = 104*x(3)*x(4)
 
-[rxn,x,expComp,ii] = varargin{:};
+[rxn,x,comp,expComp,ii] = varargin{:};
 
 [~,~,subIndx]  = intersect(upper(rxn.sub) ,upper(x.name));
 [~,~,prodIndx] = intersect(upper(rxn.prod),upper(x.name));
@@ -134,6 +134,7 @@ end
 
 subVec  = ones(size(subIndx));
 prodVec = ones(size(prodIndx));
+comptVal = [];
 
 switch rxnType
 	case 'syn'
@@ -184,6 +185,20 @@ switch rxnType
 			keyboard
 		end
 	case 'enzQSSA'
+		%Determine if overlap volume given. If not, use substrate
+		%volume
+		if isempty(rxn.A)
+			concIndx = [subIndx;enzIndx];
+			try
+				comptIndx = find(comp.tens(x.comp(concIndx))==min(comp.tens(x.comp(concIndx))),1);
+			catch err
+				keyboard
+			end
+			comptIndx = concIndx(comptIndx);
+		else
+			comptIndx = 0;
+		end
+		
 		if expComp
 			%Make new complex species
 			compIndx = length(x.name)+1;
@@ -198,74 +213,84 @@ switch rxnType
 						 ['Km   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
 			tensVal   = {[subIndx     compIndx      -k*overlap;
 						  prodIndx prodVec*compIndx  k*overlap];
-						 [subIndx   subIndx enzIndx  Km;
-						  subIndx   enzIndx subIndx  Km;
-						  enzIndx   subIndx enzIndx  Km;
-						  enzIndx   enzIndx subIndx  Km;
-						  compIndx  subIndx enzIndx -Km;
-						  compIndx  enzIndx subIndx -Km]};
+						 [compIndx  subIndx enzIndx -comptIndx -Km;
+						  compIndx  enzIndx subIndx -comptIndx -Km;
+						  subIndx   subIndx enzIndx -comptIndx  Km;
+						  subIndx   enzIndx subIndx -comptIndx  Km;
+						  enzIndx   subIndx enzIndx -comptIndx  Km;
+						  enzIndx   enzIndx subIndx -comptIndx  Km;
+						  ]};
 		else
 			reqTens   = {'k2','Km'};
 			paramDesc = {['kc/Km : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['Km    : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
 			tensVal   = {[subIndx      subIndx enzIndx       -k*overlap*subVec;
 						  prodIndx prodVec*[subIndx enzIndx]  k*overlap*prodVec];
-						  [subIndx subIndx enzIndx  Km;
-						   subIndx enzIndx subIndx  Km;
-						   enzIndx subIndx enzIndx  Km;
-						   enzIndx enzIndx subIndx  Km]};
+						  [subIndx subIndx enzIndx -comptIndx  Km;
+						   subIndx enzIndx subIndx -comptIndx  Km;
+						   enzIndx subIndx enzIndx -comptIndx  Km;
+						   enzIndx enzIndx subIndx -comptIndx  Km]};
 		end
 	case 'hillFun'
 		reqTens   = {'k1MM','KmMM','Hill_n'};
 			paramDesc = {['kc_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['Km_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
 						 ['n_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-			tensVal   = {[subIndx  enzIndx subIndx -k*overlap*subVec;
-						 prodIndx  enzIndx subIndx  k*overlap*prodVec];
-						 [subIndx  enzIndx subIndx Km;
-						 prodIndx  enzIndx subIndx Km];
-						  [subIndx enzIndx subIndx  n;
-						 prodIndx  enzIndx subIndx  n];};
+			tensVal   = {[subIndx  subIndx enzIndx -k*overlap*subVec;
+						 prodIndx  subIndx enzIndx  k*overlap*prodVec];
+						 [subIndx  subIndx enzIndx Km;
+						 prodIndx  subIndx enzIndx Km];
+						  [subIndx subIndx enzIndx  n;
+						 prodIndx  subIndx enzIndx  n];};
 end
-varargout = {reqTens,tensVal,paramDesc,x};
+varargout = {reqTens,tensVal,paramDesc,x,comptVal};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 case 'insparam'
 % Require inputs are:   [model,p]
 % Required outputs are: [model]	
 [model,p] = varargin{:};
 
+% Putting concentration into tensors
+freeInd = find(~isnan(model.conc.pInd));
+concVals = model.conc.tens;
+if ~isempty(freeInd)
+	concVals(freeInd,end) = model.conc.tens(freeInd,end).*p(model.conc.pInd(freeInd));
+end
+model.run.conc = concVals;
+
+% Putting compartments into tensors
+freeInd = find(~isnan(model.comp.pInd));
+compVals = model.comp.tens;
+if ~isempty(freeInd)
+	compVals(freeInd,end) = model.comp.tens(freeInd,end).*p(model.comp.pInd(freeInd));
+end
+model.run.comp = compVals;
+
+
 % Putting param into tensors
 x0 = model.conc.tens;
 for ii = 1:length(model.param)
 	freeInd = find(~isnan(model.param(ii).pInd));
-	if ~isempty(freeInd)
-		try
-		model.param(ii).tens(freeInd,end) = model.param(ii).tens(freeInd,end).*p(model.param(ii).pInd(freeInd));
-		catch
-			keyboard
-		end
-	end
+	tmpTens = model.param(ii).tens;
+	tmpTens(freeInd,end) = model.param(ii).tens(freeInd,end).*p(model.param(ii).pInd(freeInd));
 	% Pre-generate full matrix if possible
 	if size(model.param(ii).tens,2)==2
-		model.tensor.k0 = full(sparse(model.param(ii).tens(:,1),ones(size(model.param(ii).tens(:,1))),model.param(ii).tens(:,2)));
-		if length(model.tensor.k0)~= length(x0)
-			model.tensor.k0(size(x0,1),1) = 0;
+		model.run.tensor.k0 = full(sparse(tmpTens(:,1),ones(size(tmpTens(:,1))),tmpTens(:,2)));
+		if length(model.run.tensor.k0)~= length(x0)
+			model.run.tensor.k0(size(x0,1),1) = 0;
 		end
 	elseif size(model.param(ii).tens,2)==3
-		model.tensor.k1 = full(sparse(model.param(ii).tens(:,1),model.param(ii).tens(:,2),model.param(ii).tens(:,3)));
-		if (size(model.tensor.k1,1)~= length(x0) || size(model.tensor.k1,2)~= length(x0))
-			model.tensor.k1(size(x0,1),size(x0,1)) = 0;
+		model.run.tensor.k1 = full(sparse(tmpTens(:,1),tmpTens(:,2),tmpTens(:,3)));
+		if (size(model.run.tensor.k1,1)~= length(x0) || size(model.run.tensor.k1,2)~= length(x0))
+			model.run.tensor.k1(size(x0,1),size(x0,1)) = 0;
 		end
+	else
+		% Matrices that cannot be pregenerated. Enter parameter values
+		model.run.tensor.(['M' num2str(ii)]) = tmpTens;
 	end
 end
 
-% Putting concentration into tensors
-freeInd = find(~isnan(model.conc.pInd));
-if ~isempty(freeInd)
-	model.conc.tens(freeInd,end) = model.conc.tens(freeInd,end).*p(model.conc.pInd(freeInd));
-end
-
-varargout = {model};
+varargout = {model,p};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 case 'nondim'
@@ -274,13 +299,13 @@ case 'nondim'
 
 [model,tspan,normInp] = varargin{:};
 
-model.tensor.k0 = model.tensor.k0*(tspan(end)-tspan(1));
-model.tensor.k1 = model.tensor.k1*(tspan(end)-tspan(1));
-model.param(2).tens(:,end) = model.param(2).tens(:,end)*(tspan(end)-tspan(1));
-model.param(5).tens(:,end) = model.param(5).tens(:,end)*(tspan(end)-tspan(1));
+model.run.tensor.k0 = model.run.tensor.k0*(tspan(end)-tspan(1));
+model.run.tensor.k1 = model.run.tensor.k1*(tspan(end)-tspan(1));
+model.run.tensor.M2(:,end) = model.run.tensor.M2(:,end)*(tspan(end)-tspan(1));
+model.run.tensor.M5(:,end) = model.run.tensor.M5(:,end)*(tspan(end)-tspan(1));
 
-model.basalSigma = @(t) model.tensor.k0*ones(1,length(t)); 
-model.fullSigma = @(t) normInp(t) + model.tensor.k0*ones(1,length(t)); 
+model.run.basalSigma = @(t) model.run.tensor.k0*ones(1,length(t)); 
+model.run.fullSigma = @(t) normInp(t) + model.run.tensor.k0*ones(1,length(t)); 
 
 varargout{1} = model;
 
@@ -288,45 +313,63 @@ case 'ramp'
 % This part of the script modifies the reaction rates such that no reaction
 % occurs during the ramping phase.
 model = varargin{1};
-	model.tensor.k0 = model.tensor.k0*0;
-	model.tensor.k1 = model.tensor.k1*0;
-	model.param(2).tens(:,end) = 0;
-	model.param(5).tens(:,end) = 0;
+	model.run.tensor.k0 = model.run.tensor.k0*0;
+	model.run.tensor.k1 = model.run.tensor.k1*0;
+	model.run.tensor.M2(:,end) = 0;
+	model.run.tensor.M5(:,end) = 0;
+	model.run.tensor.M6(:,end) = 0;
+	model.run.tensor.M7(:,end) = 0;
 varargout{1} = model;
 
 case 'dyneqn'
+%% Dynamic Equation construction
 %Required inputs are [t,x,model]
 %Required outputs are [dx_dt]
 
 [t,x,model] = varargin{:};
-x(x<0) = 0; %sometimes the system goes to less than zero. When it wants to do this, set it to zero
 
-M = zeros(size(model.tensor.k1));
+% ~~Initialise matrices~~
+M = zeros(size(model.run.tensor.k1));
 L = M;
-hillTerm = M;
-compVal = model.conc.comp;
-sourceComp = compVal';
-sourceComp = sourceComp(ones(1,length(compVal)),:);
+MMTerm = M;
+compVal = model.run.comp(model.conc.comp);
 
-model.param(5).tens(:,4) = model.param(5).tens(:,4).*compVal(model.param(5).tens(:,3)).*(x(model.param(7).tens(:,3)).^model.param(7).tens(:,4))./(model.param(6).tens(:,4)+x(model.param(7).tens(:,3)).^model.param(7).tens(:,4));
+% ~~Manipulate compartments~~
+% Make an "infinite" compartment non-infinite
+indx = isinf(compVal);
+compVal(indx) = 0;
+compVal(indx) = max(compVal)*1e10;
 
-MTmp = sparse(model.param(1).tens(:,1),model.param(1).tens(:,3),x(model.param(1).tens(:,2))./model.param(1).tens(:,4));
+compNum = compVal./10.^(floor(log10(compVal)));
+compMag = floor(log10(compVal));
+
+% Compartment size correction for unimolecular type reactions.
+sourceCompk1 = compVal';
+sourceCompk1 = sourceCompk1(ones(1,length(compVal)),:);
+
+% ~~Tensor construction~~
+model.run.tensor.M5(:,4) = min(compVal(model.run.tensor.M5(:,2:3)),[],2).*...
+						   model.run.tensor.M5(:,4).*(x(model.run.tensor.M7(:,3)).^model.run.tensor.M7(:,4))./...
+						   (model.run.tensor.M6(:,4)+x(model.run.tensor.M7(:,3)).^model.run.tensor.M7(:,4));
+
+%MTmp = sparse(model.param(1).tens(:,1),model.param(1).tens(:,3),x(model.param(1).tens(:,2))./model.param(1).tens(:,4));
+compModIndx = model.run.tensor.M1(:,4)~=0;
+model.run.tensor.M1(compModIndx,5) = model.run.tensor.M1(compModIndx,5).*(compVal(abs(model.run.tensor.M1(compModIndx,4))).^sign(model.run.tensor.M1(compModIndx,4)));
+MTmp = sparse(model.run.tensor.M1(:,1),model.run.tensor.M1(:,3),x(model.run.tensor.M1(:,2))./(model.run.tensor.M1(:,5).*compVal(model.run.tensor.M1(:,1))));
+
 [a,b] = size(MTmp);
 M(1:a,1:b) = MTmp;
 
-LTmp = sparse(model.param(2).tens(:,1),model.param(2).tens(:,2),model.param(2).tens(:,4).*x(model.param(2).tens(:,3)));
+LTmp = sparse(model.run.tensor.M2(:,1),model.run.tensor.M2(:,2),model.run.tensor.M2(:,4).*x(model.run.tensor.M2(:,3)).*min(compVal(model.run.tensor.M2(:,2:3)),[],2));
 [a,b] = size(LTmp);
 L(1:a,1:b) = LTmp;
-L = L.*sourceComp;
 
-hillTmp = sparse(model.param(5).tens(:,1),model.param(5).tens(:,2),model.param(5).tens(:,4));
-[a,b] = size(hillTmp);
-hillTerm(1:a,1:b) = hillTmp;
+MMTmp = sparse(model.run.tensor.M5(:,1),model.run.tensor.M5(:,2),model.run.tensor.M5(:,4));
+[a,b] = size(MMTmp);
+MMTerm(1:a,1:b) = MMTmp;
 
-try
-	varargout{1} = ((eye(length(x))+M)\(L*x+(model.tensor.k1.*sourceComp)*x+model.k0(t).*compVal+hillTerm*x))./compVal;
-catch
-	keyboard
-end
+% Solve
+varargout{1} = (eye(length(x))+M)\((L*x+(model.run.tensor.k1.*sourceCompk1)*x+model.run.k0(t).*compVal+MMTerm*x)./compVal);
+
 
 end

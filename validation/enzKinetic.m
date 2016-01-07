@@ -57,3 +57,7 @@ rxn(end+1).label = 'B -> A | D';
     rxn(end).enz = 'D';
     rxn(end).k   = NaN; 
     rxn(end).Km  = NaN; 
+% rxn(end+1).label = 'B -> A';
+%     rxn(end).sub = 'B';  
+%     rxn(end).prod = 'A'; 
+%     rxn(end).k   = NaN;

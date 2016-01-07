@@ -1,4 +1,4 @@
-function [t,Y,YComp] = odeQSSA(model,tspan,varargin)
+function [t,Y,YComp,modelRaw] = odeQSSA(modelRaw,tspan,varargin)
 %
 % odeQSSA
 %
@@ -13,62 +13,57 @@ function [t,Y,YComp] = odeQSSA(model,tspan,varargin)
 Names = ['p       '
          'inp     '
          '-r      '
-         'r       '
 		 'y0      '
 		 'odeopts '
-		 'rd      '
+	     'errDir  '
 		 '-b      '];
      
 %Initialise potental options
 p    = [];
 x0   = [];
 tmpInp  = [];
-rampOnly = false;
-rampDebug = false;
-ramp = true;
-basal = true;
+noRamp = false;
+errDir = false;
+noBasal = false;
 
+detectOpts = true;
 %Parse optional parameters (if any)
 for ii = 1:length(varargin)
-	if ischar(varargin{ii}) %only enter loop if varargin{ii} is a parameter
+	if detectOpts %only enter loop if varargin{ii} is a parameter
+		detectOpts = false;
 		switch lower(deblank(varargin{ii}))
 			case lower(deblank(Names(1,:)))   %Parameters
 				p = varargin{ii+1};
 			case lower(deblank(Names(2,:)))   %Input
 				tmpInp = varargin{ii+1};
 			case lower(deblank(Names(3,:)))   %No initial ramping
-				ramp = false;
-			case lower(deblank(Names(4,:)))   %Ramping in initial condition
-				rampOnly = true;
-				rampDebug = false;
-			case lower(deblank(Names(5,:)))
+				noRamp = true;
+				detectOpts = true;
+			case lower(deblank(Names(4,:)))   %Initial conditions
 				x0 = varargin{ii+1};
-			case lower(deblank(Names(6,:)))
+			case lower(deblank(Names(5,:)))   %Ode options
 				options = varargin{ii+1};
-			case lower(deblank(Names(7,:)))   %Ramping in initial condition and debug (see ramping time course)
-				rampOnly = true;
-				rampDebug = true;
-			case lower(deblank(Names(8,:)))   %No basal (for running faster)
-				basal = false;
+			case lower(deblank(Names(6,:)))   %Set directory for error output
+				errDir = varargin{ii+1};
+			case lower(deblank(Names(7,:)))   %No basal
+				noBasal = true;
 			case []
 				error('Expecting Option String in input');
 			otherwise
 				error('Non-existent option selected. Check spelling.')
 		end
+	else
+	        detectOpts = true;
 	end
 end
 
 %% Compile model if new one inserted
-if ~isstruct(model)
-	model = parseModel(model,p);
-else
-	if ~isempty(p)
-		if isrow(p)
-			p = p';
-		end
-		model = model.rxnRules('insParam',model,p);
-	end
+if isrow(p)
+	p = p';
 end
+
+modelRaw = parseModel(modelRaw,'p',p);
+model = modelRaw;
 
 % %Correct dimension of x0 and tspan
 if isrow(x0)
@@ -80,8 +75,8 @@ end
 
 % Create initial concentration vector
 if isempty(x0)
-	x0 = model.conc.tens;
-elseif size(x0,1) ~= size(model.conc.tens)
+	x0 = model.run.conc;
+elseif size(x0,1) ~= size(model.run.conc)
 	x0(length(model.conc.tens)) = 0;
 end
 
@@ -153,8 +148,6 @@ elseif size(tmpInp,2)>2
 end
 	
 %% From here on in, all time is non-dimensionalised, as ode will be run from t = 0 to 1.
-% Non-dimensionalise.
-normFac = 1/trapz(linspace(0,1,10000),normpdf(linspace(0,1,10000),0,0.2));
 %Normalisation factor which makes sure the ramp in will ramp in the full
 %amount after the run time.
 normInp = @(t) inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1)); %time shift and non-dimensionalise inp;
@@ -167,59 +160,55 @@ if ~exist('options','var')
 end
 warnstate('error')
 
+try
 %% Solving
 % Ramping
-if ramp && basal
-	modelRB = model;
-	modelRB.k0 = @(t) x0*normFac*normpdf(t,0,0.2);
-	modelRB = model.rxnRules('ramp',modelRB);
-	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelRB);
-	[t,Y] = ode45(dx_dt,[0 1],x0*0,options);
-	x0 = Y(end,:)';
-end
-
-% Solve Basal Condition
-if basal && ~rampOnly
-	%Run
-	modelB = model;
-	modelB.k0 = model.basalSigma;
-	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelB);
-	converge = false;
-	ii = 1;
-	while ~converge
-		[t,Y] = ode15s(dx_dt,[0 2^ii],x0,options);
-		ii = ii + 1;
-		converge = (sqrt(sum(abs((Y(end,:)-Y(end-1,:))./(Y(end,:)+eps)).^2))/length(Y(end,:)))<1e-4;
-		x0 = Y(end,:)';
+if ~noRamp
+	modelRamp = model;
+	if noBasal
+		%Do not basal the time course. Set all rate parameters to zero.
+		modelRamp.run.k0 = @(t) (inpConst+x0)*2*normpdf(t,0,0.2);
+		modelRamp = model.rxnRules('ramp',modelRamp);
+	else
+		%Initial basal
+		%Enter the single input at the end of the time course
+		modelRamp.run.k0 = @(t) x0*2*normpdf(t,0,0.2);
 	end
+	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelRamp);
+	[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
+	y0 = Y(end,:)';
+	y0(y0<0) = 0;
+else
+	y0 = x0;
 end
 
-% Ramping
-if ramp
-	modelR = model;
-	modelR.k0 = @(t) (inpConst + x0)*normFac*normpdf(t,0,0.2);
-	modelR = model.rxnRules('ramp',modelR);
-	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelR);
-	[t,Y] = ode45(dx_dt,[0 1],x0*0,options);
-	x0 = Y(end,:);
+%Run
+if noBasal
+	model.run.k0 = model.run.fullSigma;
+else
+	model.run.k0 = @(t) model.run.fullSigma(t) + +inpConst*2*normpdf(t,0,1e-6);
 end
 
-% Solve ODE
-if ~rampOnly
-	%Run
-	model.k0 = model.fullSigma;
-	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,model);
-	[t,Y] = ode15s(dx_dt,[0 1],x0,options);
-end
+dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,model);
+[t,Y] = ode15s(dx_dt,[0 1],y0,options);
+
 t = t*(tspan(end)-tspan(1))+tspan(1); %Restore to original units
 if length(tspan)>2
 	Y = interp1(t,Y,tspan);
 	t = tspan;
 end
-
 YComp  = Y;
-Y = compDis(model,Y);      %dissociate complex
-
+catch errMsg
+%% Error catching
+	YComp = inf(length(tspan),length(x0));
+	t = tspan;
+	if errDir 
+		storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
+	else
+		storeError(modelRaw,x0,p,errMsg,errMsg.message)
+	end
+end
+Y = compDis(model,YComp);      %dissociate complex
 warnstate('on') %Switch warnings back to warnings
 end
 

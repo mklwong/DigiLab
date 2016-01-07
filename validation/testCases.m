@@ -1,6 +1,7 @@
 %%%testCase%%%
 
 % This program tests whether the odeQSSA program is working correctly.
+clear resid
 
 v = [1 2];
 
@@ -68,26 +69,28 @@ k = [0 0 1];
 resid(8) = sum(sum(YReal(:,1:2)-YMod(:,1:2)));
 
 %% Enzyme Kinetic
+%% Single
 method = 'enzQSSA';
-% Single
-x0 = [1 1 1 0 0 0 0];
-k = [1 1 1 1 1 1 1];
+x0 = [1 1 0 0 0 0 0];
+k = [10 10 1 10 10 1 0];
 kQSSA = [k(3) (k(2)+k(3))/k(1) k(6) (k(5)+k(6))/k(4)];
 [tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k,v),[0 30],x0);
 [tMod,~,YMod] = findTC(@enzKinetic,tReal,'p',[v kQSSA k(end)],'y0',x0(1:4),'-b');
 resid(9) = sum(YReal(end,1:6)-YMod(end,1:6));
 
-% Reversible
-x0 = [1 1 0 1 0 0 0];
+%% Reversible
+method = 'enzQSSA';
+x0 = [1 1 1 1 0 0 0];
+k = [10 10 1 10 10 1 0];
+kQSSA = [k(3) (k(2)+k(3))/k(1) k(6) (k(5)+k(6))/k(4)];
 [tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k,v),[0 30],x0);
-[tMod,~,YMod] = findTC(@enzKinetic,tReal,'p',[v kQSSA k(end)],'y0',x0(1:4),'-b');
+[tMod,~,YMod] = findTC(@enzKinetic,tReal,'p',[v kQSSA],'y0',x0(1:4),'-b');
 resid(10) = sum(YReal(end,1:6)-YMod(end,1:6));
 
-% Hill Function
+%% Hill Function
 method = 'hillFun';
 x0 = [1 0 10 0 0 0 0];
 k = [1 1 1 1 1 1 ];
-v = [1 1];
 [tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k,v),[0 10],x0);
 [tMod,~,YMod] = findTC(@hillFun,tReal,'p',[v k],'y0',x0(1:3),'-b');
 resid(11) = sum(YReal(end,1)-YMod(end,1));

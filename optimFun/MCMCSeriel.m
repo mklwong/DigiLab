@@ -46,13 +46,13 @@ end
 modelLoc(end-length(modName)-1:end) = [];
 
 % Load prior file (if exists)
+prirDat = strrep(prirDat,'/','\'); %Change forward slash to backslash.
 if isempty(prirDat)
     fprintf('No prior given.\n')
 elseif exist([modelLoc prirDat],'file') == 2
     load([modelLoc prirDat]); % Load prior file
     fprintf('prior file Loaded.\n')
 else
-	keyboard
 	error('Specified prior not found')
 end
 
@@ -64,7 +64,7 @@ symChar  = ['a':'z' 'A':'Z' '0':'9'];        %possible symbols
 c = clock;
 rng('shuffle'); %shuffle the random generator
 
-runID = [num2str(c(3)) '-' num2str(c(2)) '_' sysName '_' symChar(randi(length(symChar),1,5))]; %random string of 5
+runID = [num2str(c(3)) '-' num2str(c(2)) '_' num2str(c(4)) '-' num2str(c(5)) '_' sysName '_' symChar(randi(length(symChar),1,5))]; %random string of 5
 if ~exist([modelLoc '/' runID],'file')
 	mkdir(modelLoc,runID);                       %Make subdirectory
 end
@@ -98,15 +98,14 @@ fprintf('%6.2f  ',T)
 fprintf('\n')
 
 % Parse Model
-model = parseModel(model,p);
+model = parseModel(model);
 if ~exist('objFun')
 	objFun = @(p) modelObjective(model,p,U);
 end
-if exist('opts','var')
-	opts = MCMCOptimset(opts,'Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo);
-else
-	opts = MCMCOptimset('Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo);
+if ~exist('opts','var')
+	opts = MCMCOptimset();
 end
+opts = MCMCOptimset(opts,'Pmin',Pmin,'parmode',ParMode,'PtNo',ptNo,'dir',[modelLoc,runID],'display',disp);
 %%=======================================================================%%
 %%=======================START RUN=======================================%%
 %%=======================================================================%%
@@ -143,7 +142,9 @@ while ii ~= length(T)+1
 	result.T     = T(ii);
 	result.model = model;
 	result.best  = pts(logP==min(logP),:);
-	result.obj   = U;
+    if exist('U','var')
+        result.obj   = U;
+    end
     save([modelLoc runID '/' fileName],'result');
     fileLocs{ii} = fileName;
 

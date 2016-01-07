@@ -27,8 +27,9 @@ switch lower(deblank(mode))
         parBoxExist =  ~isempty(intersect({a.Name},'Parallel Computing Toolbox'));
         if parBoxExist
             matVer = version('-release');
+	    matSubVer = matVer(5);
             matVer = str2double(matVer(1:4));
-            if matVer>=2014
+            if matVer>=2014 || (matVer==2013 && strcmpi(matSubVer,'b'))
                 clustInfo = parcluster('local');
                 maxWorkers = clustInfo.NumWorkers;
                 numWorkers = min([maxWorkers numWorkers]); %Make sure required workers is not more than max workers
@@ -39,12 +40,12 @@ switch lower(deblank(mode))
                     fprintf('Cluster already open\n')
                 end
                 varargout{1} = 0;
-			else
+	    else
                 clustInfo = findResource;
                 maxWorkers = clustInfo.ClusterSize;
                 numWorkers = min([maxWorkers numWorkers]); %Make sure required workers is not more than max workers
                 if matlabpool('size')==0
-                    matlabpool('open',numWorkers);
+                    matlabpool('open');
                 else
                     fprintf('Cluster already open\n')
                 end

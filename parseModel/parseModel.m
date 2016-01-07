@@ -1,4 +1,4 @@
-function model = parseModel(modelname,p,varargin)
+function model = parseModel(modelname,varargin)
 
 % First determine if ODE model or not. Currently done using error checking
 % because not sure how to test if model is linked to a function or a
@@ -8,26 +8,24 @@ function model = parseModel(modelname,p,varargin)
 % Options
 
 %% Function options
-Names = ['expComp ';
-         'paramDef'];
+Names = ['expComp  ';
+         'modelRule';
+		 'p        '];
 
 % Default options
 expComp = true;
-model.name = modelname;
-model.rxnRules = @odeKinetic;
-	 
-if ~exist('p')
-	p = [];
-end
+modelRules = @odeKinetic;
 
 %Parse optional parameters (if any)
 for ii = 1:length(varargin)
 	if ischar(varargin{ii}) %only enter loop if varargin{ii} is a parameter
 		switch lower(deblank(varargin{ii}))
-			case lower(deblank(Names(1,:)))
+			case lower(deblank(Names(1,:))) %explicit modelling of complex or not
 				expComp = varargin{ii+1};
-			case lower(deblank(Names(2,:)))
-				model.rxnRules = varargin{ii+1};
+			case lower(deblank(Names(2,:))) %model Rules
+				modelRules = varargin{ii+1};
+			case lower(deblank(Names(3,:))) %parameter value
+				p = varargin{ii+1};
 			case []
 				error('Expecting Option String in input');
 			otherwise
@@ -36,44 +34,57 @@ for ii = 1:length(varargin)
 	end
 end
 
+% Isolate model name
+if ischar(modelname)
+	%convert function handle to string
+	modelname = str2func(modelname);
+elseif isstruct(modelname)
+	model = modelname;
+	if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'conc') && isfield(model,'pFit') && isfield(model,'param')
+		%Model structure detected
+		modelname = str2func(model.name);
+	else
+		%Unusual structure
+		error('parseModel:unexpectedModelType','Unexpected model type detected. Only strings, function handles or model structures allow')
+	end
+end
+	 
 %% Kernel
 
-modType = modelType(model.name);
+modType = modelType(modelname);
 
 if strcmp(modType,'ode15s')
-	odeFile = model;
-	if nargin == 2
-		model = @(t,x) odeFile(t,x,p);
+	if exist('p','var')
+		model = @(t,x) model(t,x,p);
 	else
-		model = @(t,x,p) odeFile(t,x,p);
+		model = @(t,x,p) model(t,x,p);
 	end
-elseif strcmp(modType,'QSSA')
-	if isa(model.name,'function_handle')
-		model.name = func2str(model.name);
-	end
-
-	% Parsing models
-	if ischar(model.name)
-		if strcmp(model.name((end-1):end),'.m')
-			model = parseModelm(model,expComp,p);
-		elseif exist([model.name '.m'],'file')
-			model = parseModelm(model,expComp,p);
-		elseif strcmp(model.name((end-3):end),'.xml')
-			model = parseModelSBML(model.name);
-		elseif exist([model.name '.xml'],'file')
-			model = parseModelSBML(model.name);
+elseif strcmp(modType,'QSSA-m') || strcmp(modType,'QSSA-sbml')
+	
+	modelname = func2str(modelname);
+	if ~exist('model','var')
+		% If model not created, parsing model
+		if strcmp(modelname((end-1):end),'.m')			% check for file extension
+			model = parseModelm(modelname,modelRules,expComp);
+		elseif strcmp(modelname((end-3):end),'.xml')   % check for file extension
+			model = parseModelSBML(modelname);
+		elseif exist([modelname '.m'],'file')    % Test if .m file exists
+			model = parseModelm(modelname,modelRules,expComp);
+		elseif exist([modelname '.xml'],'file') % Test if .xml file exists
+			model = parseModelSBML(modelname);
 		else
-			error('findTC:modelNotFound','Model file not found. Only SBML or .m files accepted')
+			error('findTC:modelNotFound','Model file not found. Only .xml or .m files accepted')
 		end
-	else
-		error('findTC:modelClassUnknown','Unable to process model. Check model type')
 	end
 	
-	% Impose passed parameter on reaction parameters, else use default in
-	% tensor
-	if ~isempty(p)
+	% Impose passed parameter on reaction parameters if parameter given
+	if exist('p','var')
 		if isrow(p)
 			p = p';
+		end
+		p_num = size(model.pFit.lim,1);
+		if length(p)<p_num
+			error(['Insufficient number of parameters passed. ' num2str(p_num) ' is required ' num2str(length(p)) ' passed'])
 		end
 		model = model.rxnRules('insParam',model,p);
 	end

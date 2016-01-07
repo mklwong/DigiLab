@@ -1,4 +1,4 @@
-function [t,Y,YComp,status] = findTC(model,tspan,varargin)
+function [t,Y,YComp,model,status] = findTC(model,tspan,varargin)
 % 
 %   [t,Y] = findTC(model,tspan,...)
 %   
@@ -71,8 +71,8 @@ function [t,Y,YComp,status] = findTC(model,tspan,varargin)
 % Determine if ODE model or QSSA model
 modType = modelType(model);
 status = 0;
-if strcmp(modType,'QSSA')
-	[t,Y,YComp] = odeQSSA(model,tspan,varargin{:}); 
+if strcmp(modType,'QSSA-m') || strcmp(modType,'QSSA-sbml')
+	[t,Y,YComp,model] = odeQSSA(model,tspan,varargin{:}); 
 elseif strcmp(modType,'ode15s')
 	%ode15s inputs is assumed to be entered as if using ode15s normally
 	if strcmp(varargin{end},'-r') %hack from findSS which sometimes passes an extra '-r' for the odeQSSA case. Must be removed here.
