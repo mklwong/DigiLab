@@ -1,4 +1,4 @@
-function [t,Y,YComp,model] = odeQSSA(modelRaw,tspan,varargin)
+function [t,Y,YComp,modelRaw] = odeQSSA(modelRaw,tspan,varargin)
 %
 % odeQSSA
 %
@@ -62,7 +62,8 @@ if isrow(p)
 	p = p';
 end
 
-model = parseModel(modelRaw,p);
+modelRaw = parseModel(modelRaw,'p',p);
+model = modelRaw;
 
 % %Correct dimension of x0 and tspan
 if isrow(x0)
@@ -74,8 +75,8 @@ end
 
 % Create initial concentration vector
 if isempty(x0)
-	x0 = model.conc.tens;
-elseif size(x0,1) ~= size(model.conc.tens)
+	x0 = model.run.conc;
+elseif size(x0,1) ~= size(model.run.conc)
 	x0(length(model.conc.tens)) = 0;
 end
 
@@ -166,21 +167,28 @@ if ~noRamp
 	modelRamp = model;
 	if noBasal
 		%Do not basal the time course. Set all rate parameters to zero.
-		modelRamp.k0 = @(t) (inpConst+x0)*2*normpdf(t,0,0.2);
+		modelRamp.run.k0 = @(t) (inpConst+x0)*2*normpdf(t,0,0.2);
 		modelRamp = model.rxnRules('ramp',modelRamp);
 	else
 		%Initial basal
 		%Enter the single input at the end of the time course
-		modelRamp.k0 = @(t) x0*2*normpdf(t,0,0.2)+inpConst*2*normpdf(t,1,1e-6);
+		modelRamp.run.k0 = @(t) x0*2*normpdf(t,0,0.2);
 	end
 	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelRamp);
 	[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
 	y0 = Y(end,:)';
 	y0(y0<0) = 0;
+else
+	y0 = x0;
 end
 
 %Run
-model.k0 = model.fullSigma;
+if noBasal
+	model.run.k0 = model.run.fullSigma;
+else
+	model.run.k0 = @(t) model.run.fullSigma(t) + +inpConst*2*normpdf(t,0,1e-6);
+end
+
 dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,model);
 [t,Y] = ode15s(dx_dt,[0 1],y0,options);
 

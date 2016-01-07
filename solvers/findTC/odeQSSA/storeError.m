@@ -39,7 +39,7 @@ errorID = floor(rand(1)*1000000);
 errorID = ['e' num2str(errorID)];
 
 %% Print the output into the error report text file
-h = fopen([dirLoc '/runError.txt'],'a+');
+h = fopen([dirLoc '/runError.txt'],'a');
 fprintf(h,'\r\n%s: %s\r\n',modName,msg);
 t = clock();
 fprintf(h,'Error found at %2.0f-%2.0f-%4.0f, %2.0f:%2.0f\r\n',t(3),t(2),t(1),t(4:5));
@@ -75,7 +75,11 @@ if exist([dirLoc '/errors.mat'],'file')
 else
 	errs = struct();
 end
-nerrs = length(errs);
+if isempty(errs)
+	nerrs = 1;
+else
+	nerrs = length(errs)+1;
+end
 errs(nerrs).p   = p;
 errs(nerrs).x0    = x0;
 errs(nerrs).model = model;

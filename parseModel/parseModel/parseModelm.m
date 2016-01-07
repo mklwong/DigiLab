@@ -1,4 +1,4 @@
-function model = parseModelm(model,expComp,p)
+function model = parseModelm(model,rxnRules,expComp)
 
 %   out = parseModelm(model,debug)
 %
@@ -108,17 +108,19 @@ function model = parseModelm(model,expComp,p)
 %%%%%%%%%%%%%%%%%%%%%
 %% Import model file
 %%%%%%%%%%%%%%%%%%%%%
+if ischar(model)
+	modelname = model;
+	clear model
+	model.name = modelname;
+end
 
 % Initialise parameters
+model.rxnRules = rxnRules;
 [param,rxn] = model.rxnRules('ini');
     
 v = rxn; %Legacy code. For backward compatibility.
 
-if isa(model.name,'function_handle')
-	model.name = func2str(model.name);
-end
-
-run(model.name); 
+run(modelname); 
 %loads the following 
 %	- spcComp: compartment info for model.
 %	- modSpc:  species infor for model

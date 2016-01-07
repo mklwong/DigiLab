@@ -71,7 +71,7 @@ function [t,Y,YComp,model,status] = findTC(model,tspan,varargin)
 % Determine if ODE model or QSSA model
 modType = modelType(model);
 status = 0;
-if strcmp(modType,'QSSA')
+if strcmp(modType,'QSSA-m') || strcmp(modType,'QSSA-sbml')
 	[t,Y,YComp,model] = odeQSSA(model,tspan,varargin{:}); 
 elseif strcmp(modType,'ode15s')
 	%ode15s inputs is assumed to be entered as if using ode15s normally
