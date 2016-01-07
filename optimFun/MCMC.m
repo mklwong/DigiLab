@@ -439,11 +439,12 @@ end
 fprintf_cust(outFileHandle,'-------------------------------\n\r');
 fprintf_cust(outFileHandle,'-------------Run Ended---------\n\r');
 fprintf_cust(outFileHandle,'-------------------------------\n\r\n\r\n\r');
-fclose(outFileHandle);
-
+if strcmpi(opts.disp,'text')
+    fclose(outFileHandle);
+end
 
 if labindx == 1
-    fprintf_cust('Done!\n')
+    fprintf_cust(outFileHandle,'Done!\n')
 end
 
 if ~opts.parMode
