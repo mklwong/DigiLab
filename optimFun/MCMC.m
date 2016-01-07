@@ -197,7 +197,7 @@ status = 1;
 
 %% Tracking Mode
 if strcmpi(opts.disp,'text')
-    outputName = [opts.dir '/Output-Slave ' num2str(labindex) '.txt'];
+    outputName = [opts.dir '/Output-Slave ' num2str(labindx) '.txt'];
     outFileHandle = fopen(outputName,'at');
 else
     outFileHandle = [];
@@ -439,12 +439,13 @@ end
 fprintf_cust(outFileHandle,'-------------------------------\n\r');
 fprintf_cust(outFileHandle,'-------------Run Ended---------\n\r');
 fprintf_cust(outFileHandle,'-------------------------------\n\r\n\r\n\r');
-if strcmpi(opts.disp,'text')
-    fclose(outFileHandle);
-end
 
 if labindx == 1
     fprintf_cust(outFileHandle,'Done!\n')
+end
+
+if strcmpi(opts.disp,'text')
+    fclose(outFileHandle);
 end
 
 if ~opts.parMode
