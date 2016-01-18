@@ -39,19 +39,7 @@ case 'ini'
 	param(7).name = 'Hill_n';
 	param(7).tens = nan(1,4);
 	
-	% All possible fields in a reaction. These are what will appear in
-	% 'rxnrules'
-	rxn = struct();
-	rxn(end).label = [];
-    rxn(end).sub = [];  
-    rxn(end).prod= []; 
-    rxn(end).enz = [];
-	rxn(end).Km = [];
-    rxn(end).k  = [];  
-	rxn(end).A  = [];
-	rxn(end).n  = [];
-	
-	varargout = {param,rxn};
+	varargout = {param};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -73,10 +61,44 @@ case 'rxnrules'
 
 [rxn,x,comp,expComp,ii] = varargin{:};
 
-[~,~,subIndx]  = intersect(upper(rxn.sub) ,upper(x.name));
-[~,~,prodIndx] = intersect(upper(rxn.prod),upper(x.name));
-[~,~,enzIndx]  = intersect(upper(rxn.enz) ,upper(x.name));
+% Convert all non-cell species references to one that has cell
+if ~iscell(rxn.sub)
+	if isempty(rxn.sub)
+		rxn.sub = '';
+	end
+	rxn.sub = {rxn.sub};
+end
+if ~iscell(rxn.prod)
+	rxn.prod = {rxn.prod};
+end
+if ~iscell(rxn.enz)
+	rxn.enz = {rxn.enz};
+end
 
+% Match species in reaction with species master list
+[~,testSub,subIndx]  = intersect(upper(rxn.sub) ,upper(x.name));
+[~,testProd,prodIndx] = intersect(upper(rxn.prod),upper(x.name));
+[~,testEnz,enzIndx]  = intersect(upper(rxn.enz) ,upper(x.name));
+
+% Check that there are no unmatched species in the reaction. If any
+% unmatched then throw an error
+if length(testSub) ~= length(rxn.sub)  && ~isempty(rxn.sub)
+	rxn.sub(testSub) = [];
+	rxn.sub(2,:) = {', '};
+	rxn.sub(end,end) = {'"'};
+	error('odeKinetic:SubstrateNotInSpeciesList',['Substrates "' horzcat(rxn.sub{:,:}) ' missing in reaction with description: "' rxn.desc '"'])
+elseif length(testProd) ~= length(rxn.prod) 
+	rxn.prod(testProd) = [];
+	rxn.prod(2,:) = {', '};
+	rxn.prod(end,end) = {'"'};
+	error('odeKinetic:ProductNotInSpeciesList',['Product "' horzcat(rxn.prod{:,:}) ' missing in reaction with description: "' rxn.desc '"'])
+elseif length(testEnz) ~= length(rxn.enz)
+	keyboard
+	rxn.enz(testEnz) = [];
+	rxn.enz(2,:) = {', '};
+	rxn.enz(end,end) = {'"'};
+	error('odeKinetic:EnzymeNotInSpeciesList',['Enzyme "' horzcat(rxn.enz{:,:}) ' missing in reaction with description: "' rxn.desc '"'])
+end
 %Change for legacy matlab versions
 if isrow(subIndx)
 	subIndx = subIndx';
@@ -126,7 +148,7 @@ k  = rxn.k;
 Km = rxn.Km;
 n  = rxn.n;
 
-overlap = rxn.A;
+overlap = rxn.r;
 
 if isempty(overlap)
 	overlap = 1;
@@ -187,7 +209,7 @@ switch rxnType
 	case 'enzQSSA'
 		%Determine if overlap volume given. If not, use substrate
 		%volume
-		if isempty(rxn.A)
+		if isempty(rxn.r)
 			concIndx = [subIndx;enzIndx];
 			try
 				comptIndx = find(comp.tens(x.comp(concIndx))==min(comp.tens(x.comp(concIndx))),1);

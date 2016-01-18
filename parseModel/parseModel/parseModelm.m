@@ -116,8 +116,8 @@ end
 
 % Initialise parameters
 model.rxnRules = rxnRules;
-[param,rxn] = model.rxnRules('ini');
-    
+param = model.rxnRules('ini');
+rxn = sigRxnList();
 v = rxn; %Legacy code. For backward compatibility.
 
 run(modelname); 
@@ -227,7 +227,7 @@ for ii=1:length(rxn)
     [rxn(ii).n,freeParam(3),grp(3),bnd{3}] = testPar(rxn(ii).n);
 	
 	% Test parameter for 'A'
-    [rxn(ii).A,freeParam(4),grp(4),bnd{4}] = testPar(rxn(ii).A);
+    [rxn(ii).r,freeParam(4),grp(4),bnd{4}] = testPar(rxn(ii).r);
 	
 	%% Turn reactions into maths using reaction rules
     [reqTens,tensVal,parDesc,conc,comptMod] = model.rxnRules('rxnRules',rxn(ii),conc,comp,expComp,ii);

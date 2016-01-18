@@ -33,7 +33,7 @@ Bnd.Conc = [1e-1 1e1];
 % Reactions are stored in the variable rxn. Each reaction has
 % between 3 to 6 fields depending on the reaction to be created. (c) marks
 % fields that are compulsory. The fields are:
-%   - Label (c): Identifier of the reaction. Used for labelling outputs.
+%   - desc (c): Identifier of the reaction. Used for descling outputs.
 %   - k     (c): Reaction rate. Is a parameter.
 %   - Sub      : List of substrates written as a cell array.
 %   - Prod     : List of products written as a cell array.
@@ -42,7 +42,7 @@ Bnd.Conc = [1e-1 1e1];
 %   
 
 %% AKT Translocation Mechanics
-rxn(end+1).label = 'Phi -> A';
+rxn(end+1).desc = 'Phi -> A';
     rxn(end).sub = '';  
     rxn(end).prod= 'A';
     rxn(end).k   = NaN; 
