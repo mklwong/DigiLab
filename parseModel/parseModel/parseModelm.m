@@ -157,6 +157,7 @@ conc.pInd    = nan(a,1);    % Vector showing the parameter index a free state wi
 
 for ii = 1:length(param) % Create pInd for all params.
 	param(ii).pInd = nan;
+	param(ii).pIndGeo = nan;
 end
 param = expandTens(param);
 
@@ -226,41 +227,54 @@ for ii=1:length(rxn)
 	% Test parameter for 'n'
     [rxn(ii).n,freeParam(3),grp(3),bnd{3}] = testPar(rxn(ii).n);
 	
-	% Test parameter for 'A'
-    [rxn(ii).r,freeParam(4),grp(4),bnd{4}] = testPar(rxn(ii).r);
+	% Test parameter for 'r'
+    [rxn(ii).r,freeParamR,grpR,bndR] = testPar(rxn(ii).r);
+	if isempty(rxn(ii).r)
+		rxn(ii).r = 1;
+	end
 	
 	%% Turn reactions into maths using reaction rules
-    [reqTens,tensVal,parDesc,conc,comptMod] = model.rxnRules('rxnRules',rxn(ii),conc,comp,expComp,ii);
+    [reqParam,rateVal,geoVal,parDesc,conc] = model.rxnRules('rxnRules',rxn(ii),conc,comp,expComp,ii);
 	
-	tensNames = {param.name};
+	paramNames = {param.name};
 	
-	% Loop through new additions 
-    for jj = 1:length(reqTens);
+	% Loop through pre-matrices that require new additions
+    for jj = 1:length(reqParam);
 		
-		[~,reqIndx] = intersect(upper(tensNames),upper(reqTens{jj}));
+		[~,reqIndx] = intersect(upper(paramNames),upper(reqParam{jj}));
 		
 		% Expand tensor as required
-		tensLength  = find(isnan(param(reqIndx).tens(:,1)),1,'first'); %Length of current tensor
-		appndLength = size(tensVal{jj},1)-1;                      %Length to be appended
-		appndIndx   = tensLength:(tensLength+appndLength);        %Indicies in current tensor new values to be appended to
-		if appndLength + tensLength + 10 > length(param(reqIndx).pInd)
+		paramLength  = find(isnan(param(reqIndx).rateVal(:,1)),1,'first'); %Length of current pre-matrix
+		appndLength = size(rateVal{jj},1)-1;                            %Length to be appended
+		appndIndx   = paramLength:(paramLength+appndLength);            %Indicies in current tensor new values to be appended to
+		if appndLength + paramLength + 10 > length(param(reqIndx).pInd)
 			param(reqIndx) = expand(param(reqIndx));
 		end
 		
-		% Insert parameter indicies for free parameters
+		% Insert parameter indicies for free rate parameters
 		if freeParam(jj)
-			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bnd{jj},Bnd.(reqTens{jj}),paramGrp,grp(jj));
+			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bnd{jj},Bnd.(reqParam{jj}),paramGrp,grp(jj));
 			param(reqIndx).pInd(appndIndx) = putParInd;               %Append parameter index
 		else
 			param(reqIndx).pInd(appndIndx) = NaN;                     %Mark no parameter needed
 		end
-		param(reqIndx).tens(appndIndx,:) = tensVal{jj};               %Append tensor
+		
+		% Insert parameter indicies for free rate parameters
+		if freeParamR
+			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bndR,Bnd.(reqParam{jj}),paramGrp,grpR);
+			param(reqIndx).pIndGeo(appndIndx) = putParInd;               %Append parameter index
+		else
+			param(reqIndx).pIndGeo(appndIndx) = NaN;                     %Mark no parameter needed
+		end
+		
+		param(reqIndx).rateVal(appndIndx,:) = rateVal{jj};               %Append tensor
+		param(reqIndx).geoVal(appndIndx,:)  = geoVal{jj};               %Append tensor
     end
 end
 
 % remove NaN rows from generated tensors
 for ii = 1:length(param)
-	paramRmIndx = isnan(param(ii).tens(:,1));
+	paramRmIndx = isnan(param(ii).rateVal(:,1));
 	param(ii) = contractTens(param(ii),paramRmIndx);
 end
 pFitRmIndx = isnan(pFit.lim(:,1));

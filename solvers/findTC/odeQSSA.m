@@ -62,8 +62,7 @@ if isrow(p)
 	p = p';
 end
 
-modelRaw = parseModel(modelRaw,'p',p);
-model = modelRaw;
+modelRaw = parseModel(modelRaw);
 
 % %Correct dimension of x0 and tspan
 if isrow(x0)
@@ -75,18 +74,19 @@ end
 
 % Create initial concentration vector
 if isempty(x0)
-	x0 = model.run.conc;
-elseif size(x0,1) ~= size(model.run.conc)
-	x0(length(model.conc.tens)) = 0;
+	x0 = modelRaw.conc.tens;
+elseif size(x0,1) ~= size(modelRaw.conc.tens)
+	x0(length(modelRaw.conc.tens)) = 0;
 end
 
+%% Determining input values
 inpConst = zeros(length(x0),1);
 inpFun = @(t)zeros(length(x0),1);
 %Input values: make all into either function handles or vectors
 % This component looks at the experiment-simulation name pair, then
 % compares the experiment name with the name given in the 
 if iscell(tmpInp) %state name-val pair
-	protList = model.conc.name;
+	protList = modelRaw.conc.name;
 	inpFunInd = [];
 	inpConstInd = [];
 	for ii = 1:size(tmpInp,1)
@@ -146,13 +146,11 @@ elseif min(size(tmpInp))==1          %vector of spiked final concentration
 elseif size(tmpInp,2)>2
 	error('odeQSSA:inpArrayDimWrong','Dimension of system input incorrect. Check your inputs')
 end
-	
-%% From here on in, all time is non-dimensionalised, as ode will be run from t = 0 to 1.
-%Normalisation factor which makes sure the ramp in will ramp in the full
-%amount after the run time.
-normInp = @(t) inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1)); %time shift and non-dimensionalise inp;
 
-model = model.rxnRules('nondim',model,tspan,normInp);
+%% non-dimensionalisation of time
+normInp = @(t) inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1)); %non-dimensionalise inp;
+
+[modelOut,modelRamp] = modelRaw.rxnRules('insparam',modelRaw,p,tspan,normInp);
 
 %ODE Solver options and warning
 if ~exist('options','var')
@@ -164,17 +162,16 @@ try
 %% Solving
 % Ramping
 if ~noRamp
-	modelRamp = model;
 	if noBasal
 		%Do not basal the time course. Set all rate parameters to zero.
-		modelRamp.run.k0 = @(t) (inpConst+x0)*2*normpdf(t,0,0.2);
-		modelRamp = model.rxnRules('ramp',modelRamp);
+		modelRamp.sigma = @(t) (inpConst+x0)*2*normpdf(t,0,0.2);
+		modelRamp = modelRaw.rxnRules('ramp',modelRamp);
 	else
 		%Initial basal
 		%Enter the single input at the end of the time course
-		modelRamp.run.k0 = @(t) x0*2*normpdf(t,0,0.2);
+		modelRamp.sigma = @(t) x0*2*normpdf(t,0,0.2);
 	end
-	dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,modelRamp);
+	dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelRamp);
 	[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
 	y0 = Y(end,:)';
 	y0(y0<0) = 0;
@@ -183,13 +180,11 @@ else
 end
 
 %Run
-if noBasal
-	model.run.k0 = model.run.fullSigma;
-else
-	model.run.k0 = @(t) model.run.fullSigma(t) + +inpConst*2*normpdf(t,0,1e-6);
+if ~noBasal
+	modelOut.sigma = @(t) modelOut.sigma(t) + inpConst*2*normpdf(t,0,1e-6);
 end
 
-dx_dt = @(t,x) model.rxnRules('dynEqn',t,x,model);
+dx_dt = @(t,x) modelOut.rxnRules('dynEqn',t,x,modelOut);
 [t,Y] = ode15s(dx_dt,[0 1],y0,options);
 
 t = t*(tspan(end)-tspan(1))+tspan(1); %Restore to original units
@@ -208,7 +203,7 @@ catch errMsg
 		storeError(modelRaw,x0,p,errMsg,errMsg.message)
 	end
 end
-Y = compDis(model,YComp);      %dissociate complex
+Y = compDis(modelOut,YComp);      %dissociate complex
 warnstate('on') %Switch warnings back to warnings
 end
 
