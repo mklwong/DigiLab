@@ -13,7 +13,7 @@ Names = ['expComp  ';
 		 'p        '];
 
 % Default options
-expComp = true;
+flag = true;
 modelRules = @odeKinetic;
 
 %Parse optional parameters (if any)
@@ -21,7 +21,7 @@ for ii = 1:length(varargin)
 	if ischar(varargin{ii}) %only enter loop if varargin{ii} is a parameter
 		switch lower(deblank(varargin{ii}))
 			case lower(deblank(Names(1,:))) %explicit modelling of complex or not
-				expComp = varargin{ii+1};
+				flag(1) = varargin{ii+1};
 			case lower(deblank(Names(2,:))) %model Rules
 				modelRules = varargin{ii+1};
 			case lower(deblank(Names(3,:))) %parameter value
@@ -65,11 +65,11 @@ elseif strcmp(modType,'QSSA-m') || strcmp(modType,'QSSA-sbml')
 	if ~exist('model','var')
 		% If model not created, parsing model
 		if strcmp(modelname((end-1):end),'.m')			% check for file extension
-			model = parseModelm(modelname,modelRules,expComp);
+			model = parseModelm(modelname,modelRules,flag);
 		elseif strcmp(modelname((end-3):end),'.xml')   % check for file extension
 			model = parseModelSBML(modelname);
 		elseif exist([modelname '.m'],'file')    % Test if .m file exists
-			model = parseModelm(modelname,modelRules,expComp);
+			model = parseModelm(modelname,modelRules,flag);
 		elseif exist([modelname '.xml'],'file') % Test if .xml file exists
 			model = parseModelSBML(modelname);
 		else
