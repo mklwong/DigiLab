@@ -19,32 +19,30 @@ case 'ini'
 	% These are what will appear in the kinetic equation
 	
 	param(1).name = 'Km';
-	param(1).rateVal = nan(1,5);
+	param(1).matVal = nan(1,5);
 	%[rate_indx,rate_R1_indx,R2_indx,geo_pindx,Km_pindx]
-	param(1).bndType = {'','','','r','Km'};
 	
 	param(2).name = 'k2';
-	param(2).rateVal = nan(1,5);
+	param(2).matVal = nan(1,5);
 	%[prod_indx,R1_indx,R2_indx,geo_pindx,k2_pindx]
-	
+    
 	param(3).name = 'k1';
-	param(3).rateVal = nan(1,4);
+	param(3).matVal = nan(1,4);
 	%[prod_indx,R1_indx,geo_pindx,k1_pindx]
-	
+    
 	param(4).name = 'k0';
-	param(4).rateVal = nan(1,2);
+	param(4).matVal = nan(1,2);
 	%[prod_indx,k0_pindx]
-	
+    
 	param(5).name = 'Hill';
-	param(5).rateVal = nan(1,7);
+	param(5).matVal = nan(1,7);
 	%[prod_indx,sub_indx,enz_indx,geo_pindx,k1_pindx,Km_pindx,n_pindx]
-	
 	varargout = {param};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 case 'rxnrules'
-% Require inputs are: [rxn,x,expComp]
+% Require inputs are: [rxn,x,flags]
 % Required outputs are: [reqTens,tensVal,paramDesc,x*]	
 %	* x is used when new species need to be created. It is passed in the
 %	output to inform the rest of the program of the species change it
@@ -59,7 +57,7 @@ case 'rxnrules'
 %
 % Rate is dx_dt = param*x*x. The indices implies dx_dt(1) = 104*x(3)*x(4)
 
-[rxn,x,comp,expComp,ii] = varargin{:};
+[rxn,modSpc,flag,ii] = varargin{:};
 
 % Convert all non-cell species references to one that has cell
 if ~iscell(rxn.sub)
@@ -76,9 +74,9 @@ if ~iscell(rxn.enz)
 end
 
 % Match species in reaction with species master list
-[~,testSub,subIndx]  = intersect(upper(rxn.sub) ,upper(x.name));
-[~,testProd,prodIndx] = intersect(upper(rxn.prod),upper(x.name));
-[~,testEnz,enzIndx]  = intersect(upper(rxn.enz) ,upper(x.name));
+[~,testSub,subIndx]  = intersect(upper(rxn.sub) ,upper(modSpc.name));
+[~,testProd,prodIndx] = intersect(upper(rxn.prod),upper(modSpc.name));
+[~,testEnz,enzIndx]  = intersect(upper(rxn.enz) ,upper(modSpc.name));
 
 % Check that there are no unmatched species in the reaction. If any
 % unmatched then throw an error
@@ -149,11 +147,9 @@ end
 k  = rxn.k;
 Km = rxn.Km;
 n  = rxn.n;
-
-overlap = rxn.r;
-
-if isempty(overlap)
-	overlap = 1;
+r = rxn.r;
+if isempty(r)
+	r = 1;
 end
 
 subVec  = ones(size(subIndx));
@@ -164,124 +160,122 @@ prodVec = ones(size(prodIndx));
 			% Header
 			reqTens   = {'k0'};
 			% Synthesis
-			paramDesc = {['k    : phi -> ' x.name{prodIndx}]};  
+			paramDesc = {'k','k0',['k    : phi -> ' modSpc.name{prodIndx}]};  
 
 			% Maths
-			tensVal   = {[prodIndx k*prodVec]};
-			geoVal   = {nan(size(prodVec))};
+			matVal   = {[prodIndx k*prodVec]};
+            pBuild   = {{'','k'}};
 		case 'uni'
 			% Header
 			reqTens   = {'k1'};
 			if isempty(prodIndx)
 				% Degradation
-				paramDesc = {['k    : ' x.name{subIndx} ' -> phi'];};
+                rxnFormula = [modSpc.name{subIndx} ' -> phi'];
+                paramDesc = {'r','r',['VolOverlap: ' rxnFormula];
+                             'k','k1',['k: ' rxnFormula]};
 			elseif subIndx(1)==prodIndx(1)
 				% Enzyme mediated Synthesis
-				paramDesc = {['k    : phi -> ' x.name{prodIndx(2:end)} ' | ' x.name{subIndx}];};
+				rxnFormula = [modSpc.name{prodIndx(2:end)} ' | ' modSpc.name{subIndx}];
+                paramDesc = {'r','r',['VolOverlap: ' rxnFormula];
+                             'k','k1',['k/Km: ' rxnFormula]};
 			else
 				% Unimolecular conversion/dissociation
-				paramDesc = {['k    : ' x.name{subIndx} ' -> ' x.name{prodIndx}];};
-			end
+				rxnFormula = [modSpc.name{subIndx} ' -> ' modSpc.name{prodIndx}];
+                paramDesc = {'r','r',['VolOverlap: ' rxnFormula];
+                             'k','k1',['k: ' rxnFormula]};
+            end
 
+                         
 			% Maths
 				% Everything else
-				tensVal   = {[subIndx         subIndx              -k*subVec;
-							  prodIndx        subIndx'*prodVec      k*prodVec]};
-				geoVal    = {[overlap*subVec;
-							  overlap*prodVec]};
+				matVal   = {[subIndx         subIndx               subVec*[r -k];
+							 prodIndx        subIndx'*prodVec     prodVec*[r  k]]};
+                pBuild   = {{'','','r','k'}};
+                            
 		case 'bi'
 			% Header
 			reqTens   = {'k2'};
 			if isempty(rxn.enz)
 				% Association
-				paramDesc = {['k    : ' x.name{subIndx} ' -> ' x.name{prodIndx}];};
+                rxnFormula = [modSpc.name{subIndx} ' -> ' modSpc.name{prodIndx}];
+				paramDesc = {'r','r',['volOverlap: ' rxnFormula];
+                             'k','k2',['k: ' rxnFormula];};
 			elseif (prodIndx(1)==subIndx(1)) && length(prodIndx)==1
 				% Simplified enzyme mediated degradation
-				paramDesc = {['kc/Km: ' x.name{subIndx(2)} ' ->  phi | ' x.name{subIndx(1)}]};
-			elseif (prodIndx(1)==subIndx(1))
+                rxnFormula = [modSpc.name{subIndx(2)} ' ->  phi | ' modSpc.name{subIndx(1)}];
+				paramDesc = {'r','r',['volOverlap: ' rxnFormula];
+                             'k','k2',['kc/Km: ' rxnFormula]};
+            elseif (prodIndx(1)==subIndx(1))
 				% Simplified enzyme kinetics
-				paramDesc = {['kc/Km: ' x.name{subIndx(2)} ' -> ' x.name{prodIndx(2)} '| ' x.name{subIndx(1)}]};
+                rxnFormula = [modSpc.name{subIndx} ' -> ' modSpc.name{prodIndx}];
+				paramDesc = {'r','r',['volOverlap: ' rxnFormula];
+                             'k','k2',['kc/Km: ' rxnFormula]};
 			end
 
 			% Maths
-			tensVal   = {[[subIndx  subVec*subIndx'  -k*subVec];
-						  [prodIndx prodVec*subIndx'  k*prodVec]]};
-					  
-			geoVal    = {[overlap*subVec;
-						  overlap*prodVec]};
+			matVal   = {[[subIndx  subVec*subIndx'   subVec*[r -k]];
+						  [prodIndx prodVec*subIndx' prodVec*[r  k]]]};
+            pBuild   = {{'','','','r','k'}};
+                      
 		case 'enzQSSA'
 			%Determine if overlap volume given. If not, use substrate
 			%volume
 
-			if expComp
+			if flag(1)
 				%Make new complex species
-				compIndx = length(x.name)+1;
-				x.name{compIndx} = [x.name{subIndx} '-' x.name{enzIndx}];
-				x.comp(compIndx) = x.comp(subIndx); %Assume complex formed is in same compartment as substrate
-				x.tens(compIndx) = 0;
-				x.pInd(compIndx) = NaN;
+				compIndx = length(modSpc.name)+1;
+				modSpc.name{compIndx} = [modSpc.name{subIndx} '-' modSpc.name{enzIndx}];
+				modSpc.comp(compIndx) = modSpc.comp(subIndx); %Assume complex formed is in same compartment as substrate
+				modSpc.matVal(compIndx) = 0;
+				modSpc.pInd(compIndx) = NaN;
 
 				%Insert tensor values
 				reqTens   = {'k1','Km'};
-				paramDesc = {['kc   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
-							 ['Km   : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-				tensVal   = {[subIndx     compIndx      -k;
-							  prodIndx prodVec*compIndx  k];
-							 [compIndx  subIndx enzIndx -Km;
-							  compIndx  enzIndx subIndx -Km;
-							  subIndx   subIndx enzIndx  Km;
-							  subIndx   enzIndx subIndx  Km;
-							  enzIndx   subIndx enzIndx  Km;
-							  enzIndx   enzIndx subIndx  Km;
+                rxnFormula = [modSpc.name{subIndx} ' -> ' modSpc.name{prodIndx} ' [' modSpc.name{enzIndx} ']'];
+				paramDesc = {'r','r',['VolOverlap: ' rxnFormula];
+                             'k','k1',['kc: ' rxnFormula];
+							 'Km','Km',['Km: ' rxnFormula]};
+				matVal   = {[subIndx     compIndx          [r -k];
+							  prodIndx prodVec*compIndx  prodVec*[r k]];
+							 [compIndx  subIndx enzIndx r -Km;
+							  compIndx  enzIndx subIndx r -Km;
+							  subIndx   subIndx enzIndx r  Km;
+							  subIndx   enzIndx subIndx r  Km;
+							  enzIndx   subIndx enzIndx r  Km;
+							  enzIndx   enzIndx subIndx r  Km;
 							  ]};
-						  
-				geoVal   = {[overlap*subVec;
-							 overlap*prodVec];
-							 [overlap;
-							  overlap;
-							  overlap;
-							  overlap;
-							  overlap;
-							  overlap]};
+                pBuild   = {{'','','r','k'};
+                            {'','','','r','Km'}};
 			else
 				reqTens   = {'k2','Km'};
-				paramDesc = {['kc/Km : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
-							 ['Km    : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
+                rxnFormula = [modSpc.name{subIndx} ' -> ' modSpc.name{prodIndx} ' [' modSpc.name{enzIndx} ']'];
+				paramDesc = {'r','r',['VolOverlap : ' rxnFormula];
+                             'k','k2',['kc/Km : ' rxnFormula];
+							 'Km','Km',['Km    : ' rxnFormula]};
 						 
-				tensVal   = {[subIndx      subIndx enzIndx       -k*subVec;
-							  prodIndx prodVec*[subIndx enzIndx]  k*prodVec];
-							  [subIndx subIndx enzIndx Km;
-							   subIndx enzIndx subIndx Km;
-							   enzIndx subIndx enzIndx Km;
-							   enzIndx enzIndx subIndx Km]};
-						   
-				geoVal   = {[overlap*subVec;
-							 overlap*prodVec];
-							 [overlap;
-							  overlap;
-							  overlap;
-							  overlap]};
+				matVal   = {[subIndx      subIndx enzIndx        subVec*[r -k];
+							  prodIndx prodVec*[subIndx enzIndx] prodVec*[r  k]];
+							  [subIndx subIndx enzIndx r Km;
+							   subIndx enzIndx subIndx r Km;
+							   enzIndx subIndx enzIndx r Km;
+							   enzIndx enzIndx subIndx r Km]};
+                pBuild   = {{'','','','r','k'};
+                            {'','','','r','Km'}};
 			end
 		case 'hillFun'
-			reqTens   = {'k1MM','KmMM','Hill_n'};
-				paramDesc = {['kc_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
-							 ['Km_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']'];
-							 ['n_Hill : ' x.name{subIndx} ' -> ' x.name{prodIndx} ' [' x.name{enzIndx} ']']};
-				tensVal   = {[subIndx  subIndx enzIndx -k*subVec;
-							 prodIndx  subIndx enzIndx  k*prodVec];
-							 [subIndx  subIndx enzIndx Km;
-							 prodIndx  subIndx enzIndx Km];
-							  [subIndx subIndx enzIndx  n;
-							 prodIndx  subIndx enzIndx  n];};
-						 
-				geoVal    = {[overlap*subVec;
-							  overlap*prodVec];
-							 [NaN;
-							  NaN];
-							  [NaN;
-							  NaN];};
+			reqTens   = {'Hill'};
+                rxnFormula = [modSpc.name{subIndx} ' -> ' modSpc.name{prodIndx} ' [' modSpc.name{enzIndx} ']'];
+				paramDesc = {'r','r',['VolOverlap: ' rxnFormula]
+                             'k','k1',['kc_Hill: ' rxnFormula];
+							 'Km','Km',['Km_Hill: ' rxnFormula];
+							 'n','n',['n_Hill: ' rxnFormula]};
+				matVal   = {[subIndx  subIndx enzIndx  subVec*[r -k Km n];
+							 prodIndx  subIndx enzIndx prodVec*[r  k Km n]]
+                             };
+                pBuild   = {{'','','','r','k','Km','n'};
+                            {'','','','r','k','Km','n'}};
 	end
-	varargout = {reqTens,tensVal,geoVal,paramDesc,x};
+	varargout = {reqTens,matVal,pBuild,paramDesc,modSpc};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 case 'insparam'
 % Require inputs are:   [model,p]

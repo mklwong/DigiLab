@@ -1,4 +1,4 @@
-function model = parseModelm(model,rxnRules,expComp)
+function model = parseModelm(model,rxnRules,flags)
 
 %   out = parseModelm(model,debug)
 %
@@ -120,211 +120,198 @@ param = model.rxnRules('ini');
 rxn = sigRxnList();
 v = rxn; %Legacy code. For backward compatibility.
 
+rxn(1) = []; %When rxn is initialised it always creates an empty reaction. Remove this.
+
 run(modelname); 
 %loads the following 
-%	- spcComp: compartment info for model.
+%	- modComp: compartment info for model.
 %	- modSpc:  species infor for model
 %	- dataSpc: how data readout and model species are related
 %	- Bnd:	   default boundaries for parameter types
 %	- rxn:	   list of reactions of the model
 
-rxn(1) = []; % remove 
 % Legacy code
 if size(v) > 1
     error('Please change all v in your model file into rxn. v no longer recognised as reaction network variable')
 end
 
+%Convert all compartment and species arrays into structures
+modSpc = cell2struct(modSpc,{'name','comp','matVal'},2);
+modComp = cell2struct(modComp,{'name','matVal'},2);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Initialise Output Structs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Initalise parameter vector
-pFit.desc = cell(100,1); pFit.lim  = nan(100,2);
-curParInd = 0;
+pFit.desc = cell(100,1); pFit.lim  = nan(100,2); pFit.npar = 0; pFit.grp = zeros(0,2);
 paramGrp = [-1,-1];
 
-% Initialise chemical species
-[a,~]     = size(spcComp);
-comp.tens    = nan(a,1);    % Compartment size
-comp.name    = cell(a,1);   % Compartment name
-comp.pInd    = nan(a,1);    % Vector showing the parameter index a free comprtment will use
-
-% Initialise chemical species
-[a,~]     = size(modSpc);
-conc.tens    = nan(a,1);    % Initial concentration
-conc.name    = cell(a,1);   % Species name
-conc.comp    = ones(a,1);   % Compartment Index
-conc.pInd    = nan(a,1);    % Vector showing the parameter index a free state will use
-
 for ii = 1:length(param) % Create pInd for all params.
-	param(ii).pInd = nan;
-	param(ii).pIndGeo = nan;
+	param(ii).pInd = nan(size(param(ii).matVal));
 end
 param = expandTens(param);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over compartments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-for ii = 1:size(spcComp,1)
-	% Save Name
-	comp.name(ii) = spcComp(ii,1);
-	
+for ii = 1:size(modComp)
 	% Process parameter
-    [val,freeParam,grp] = testPar(spcComp{ii,2});
-	comp.tens(ii) = val;
+    [modComp(ii),pInd,pFit] = testPar2(modComp(ii),pFit);
 	
-	parDesc = ['Comp : ' spcComp{ii,1}];
-	if freeParam
-		if length(spcComp{ii,2})==3
-			custBnd = spcComp{ii,2}(2:3);
-		else
-			custBnd = [];
-		end
-		[pFit,conc,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,conc,custBnd,Bnd.Conc,paramGrp,grp);
-		comp.pInd(ii) = putParInd; % store p index of the compartment is assigned to
-	end
+    if ~isnan(pInd(2))
+        parDesc = ['Comp : ' modComp(ii).name];
+        pFit.desc{pInd(2)} = parDesc;
+        pFit.lim(pInd(2),:) = Bnd.Comp;
+    end
+    
+    modComp(ii).pInd = pInd(2);
 end		
+% Constract modComp
+tmpComp.name   = vertcat({modComp.name})';
+tmpComp.matVal = vertcat(modComp.matVal);
+tmpComp.pInd   = vertcat(modComp.pInd);
 
+modComp = tmpComp;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over list of species
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for ii = 1:a
-    % Save Name
-	conc.name{ii} = modSpc{ii,1};
+for ii = 1:size(modSpc)
+	% Process parameter
+    [modSpc(ii),pInd,pFit] = testPar2(modSpc(ii),pFit);
+	
+    if ~isnan(pInd(3))
+        parDesc = ['Conc : ' modSpc(ii).name];
+        pFit.desc{pInd(3)} = parDesc;
+        pFit.lim(pInd(3),:) = Bnd.Conc;
+    end
     
-    % Get compartment size for each species
-	[~,comptIndx] = intersect(upper(spcComp(:,1)),upper(modSpc{ii,2}));
-	conc.comp(ii) = comptIndx;
-
-    % Process parameter
-    [val,freeParam,grp] = testPar(modSpc{ii,3});
-    
-	conc.tens(ii) = val; % Save either parameter value of parameter multiplicative factor
-    parDesc = ['Conc : ' modSpc{ii,1}];
-	if freeParam
-		if length(modSpc{ii,3})==3
-			custBnd = modSpc{ii,3}(2:3);
-		else
-			custBnd = [];
-		end
-		[pFit,conc,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,conc,custBnd,Bnd.Conc,paramGrp,grp);
-		conc.pInd(ii) = putParInd; % store p index of the x0 is assigned to
-	end
+    modSpc(ii).pInd = pInd(3);
 end
+% Constract modComp
+tmpSpc.name   = vertcat({modSpc.name});
+[~,tmpSpc.comp] = ismember(vertcat({modSpc.comp}),modComp.name);
+tmpSpc.comp = tmpSpc.comp';
+tmpSpc.matVal = vertcat(modSpc.matVal);
+tmpSpc.pInd   = vertcat(modSpc.pInd);
+
+modSpc = tmpSpc;
+
+%Substitute in compartment
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over list of Reactions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+paramNames = {param.name}; %get list of parameter names
+BndCell = [fieldnames(Bnd) struct2cell(Bnd)];
 for ii=1:length(rxn)
 	
 	%% Determine if parameters are free or not
-    % Test parameter for 'k'
-    [rxn(ii).k,freeParam(1),grp(1),bnd{1}] = testPar(rxn(ii).k);
-	
-    % Test parameter for 'Km'
-    [rxn(ii).Km,freeParam(2),grp(2),bnd{2}] = testPar(rxn(ii).Km);
-	
-	% Test parameter for 'n'
-    [rxn(ii).n,freeParam(3),grp(3),bnd{3}] = testPar(rxn(ii).n);
-	
-	% Test parameter for 'r'
-    [rxn(ii).r,freeParamR,grpR,bndR] = testPar(rxn(ii).r);
-	if isempty(rxn(ii).r)
-		rxn(ii).r = 1;
-	end
+    [rxn(ii),pInd,pFit] = testPar2(rxn(ii),pFit);
 	
 	%% Turn reactions into maths using reaction rules
-    [reqParam,rateVal,geoVal,parDesc,conc] = model.rxnRules('rxnRules',rxn(ii),conc,comp,expComp,ii);
+    [reqParam,matVal,pBuild,parDesc,modSpc] = model.rxnRules('rxnRules',rxn(ii),modSpc,flags,ii);
 	
-	paramNames = {param.name};
-	
-	% Loop through pre-matrices that require new additions
+    % Get definition of parameters
+    [~,pList2Desc] = ismember(parDesc(:,1),fieldnames(rxn(ii))); % parDesc to pInd mapping
+     
+    % Remove non-free parameters from parDesc and insert definition
+    parDesc(isnan(pInd(pList2Desc)),:) = [];    %Remove parameters that are not free from parDesc
+    pList2Desc(isnan(pInd(pList2Desc))) = [];   %Remove equivalent indices from pList2Desc
+    % Account for grouped parameters that have popped up again. They need
+    % to be skipped so "leading description" is not replaced.
+    for jj = 1:length(pList2Desc)
+        pFit.desc{pInd(pList2Desc(jj))} = [pFit.desc{pInd(pList2Desc(jj))} ' | ' parDesc{jj,3}]; %Insert definition
+    end
+    
+    % Loop through pre-matrices that require new additions and build the
+    % pre-matrix
     for jj = 1:length(reqParam);
-		
-		[~,reqIndx] = intersect(upper(paramNames),upper(reqParam{jj}));
-		
-		% Expand tensor as required
-		paramLength  = find(isnan(param(reqIndx).rateVal(:,1)),1,'first'); %Length of current pre-matrix
-		appndLength = size(rateVal{jj},1)-1;                            %Length to be appended
-		appndIndx   = paramLength:(paramLength+appndLength);            %Indicies in current tensor new values to be appended to
-		if appndLength + paramLength + 10 > length(param(reqIndx).pInd)
-			param(reqIndx) = expand(param(reqIndx));
-		end
-		
-		% Insert parameter indicies for free rate parameters
-		if freeParam(jj)
-			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bnd{jj},Bnd.(reqParam{jj}),paramGrp,grp(jj));
-			param(reqIndx).pInd(appndIndx) = putParInd;               %Append parameter index
-		else
-			param(reqIndx).pInd(appndIndx) = NaN;                     %Mark no parameter needed
-		end
-		
-		% Insert parameter indicies for free rate parameters
-		if freeParamR
-			[pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc{jj},param,bndR,Bnd.(reqParam{jj}),paramGrp,grpR);
-			param(reqIndx).pIndGeo(appndIndx) = putParInd;               %Append parameter index
-		else
-			param(reqIndx).pIndGeo(appndIndx) = NaN;                     %Mark no parameter needed
-		end
-		
-		param(reqIndx).rateVal(appndIndx,:) = rateVal{jj};               %Append tensor
-		param(reqIndx).geoVal(appndIndx,:)  = geoVal{jj};               %Append tensor
+		%Make param builder
+        pIndBuild = nan(size(pBuild{jj}));
+        [~,pBuild2pInd] = ismember(pBuild{jj},parDesc(:,1)); % parDesc to pInd mapping
+        pIndBuild(pBuild2pInd~=0) = pInd(pList2Desc((pBuild2pInd(pBuild2pInd~=0))));
+        pIndBuild = pIndBuild(ones(1,size(matVal{jj},1)),:);
+
+        %Append both into their required pre-matrices
+        [~,paramInd,~] = intersect(paramNames,reqParam{jj});
+        matInd = find(isnan(param(paramInd).matVal(:,1)),1,'first');
+        param(paramInd).matVal(matInd:(matInd+size(matVal{jj},1)-1),:) = matVal{jj};
+        param(paramInd).pInd(matInd:(matInd+size(matVal{jj},1)-1),:)   = pIndBuild;
+    end
+    
+    % Get boundary definition for parameter. Note this comes after making
+    % pre-matrices because non-free parameters have been removed from
+    % parDesc. But in the next step we will be removing more than that. So
+    % compiling pre-matrix is most convenient before the boundary
+    % incorporation step.
+    
+    %1) Check back to pFit.lim to see if any boundaries of mapped free
+    %parameters are already defined (i.e. they are custom).  Remove these
+    %indices.
+    parDesc(~isnan(pFit.lim(pInd(pList2Desc),1)),:) = [];
+    pList2Desc(~isnan(pFit.lim(pInd(pList2Desc),1))) = [];
+    
+    % Get the field from Bnd which corresponds to the free parameter in
+    % question
+    if ~isempty(pList2Desc)
+        [~,bnd2Desc] = ismember(parDesc(:,2),fieldnames(Bnd)); % parDesc to pInd mapping
+        pFit.lim(pInd(pList2Desc),:) = vertcat(BndCell{bnd2Desc,2});
     end
 end
 
 % remove NaN rows from generated tensors
 for ii = 1:length(param)
-	paramRmIndx = isnan(param(ii).rateVal(:,1));
+	paramRmIndx = isnan(param(ii).matVal(:,1));
 	param(ii) = contractTens(param(ii),paramRmIndx);
 end
 pFitRmIndx = isnan(pFit.lim(:,1));
 pFit  = contractTens(pFit,pFitRmIndx);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Determine data and model relation
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rmXData = [];  % List of dataSpcs to remove due to not having all species in the model.
-
-% Loop through experimental species
-for ii = 1:size(dataSpc,1)
-	% Loop through attached model state
-	dataSpcTmp = zeros(size(dataSpc{ii,2}));
-	for jj = 1:length(dataSpc{ii,2})
-		
-		% Determine if complex of model species needs to be included.
-		% model species with start in them will have enzyme-substrate
-		% complex included (flat -1).
-		if strcmp(dataSpc{ii,2}{jj}(1),'*')
-			incComp = -1;
-			dataSpc{ii,2}{jj}(1) = [];
-		else
-			incComp = 1;
-		end
-		
-		% Get species name index
-		[~,~,indx]  = intersect(upper(dataSpc{ii,2}{jj}),upper(conc.name));
-		
-		% If required model species not in the simulation. Print warning and then exclude
-        if isempty(indx)
-			storeError(model,[],[],[],['The state ' dataSpc{ii,2}{jj} ' required as an experimental equivalent state not found. This experimental state will be excluded from curve fitting'])
-            rmXData = ii;
-			break
-		end
-		
-		% Store index of model species including flag of whether to include
-		% enzyme-substrate complex or not.
-		dataSpcTmp(jj) = incComp*indx;
-	end
-	dataSpc{ii,2} = dataSpcTmp;
-end
-dataSpc(rmXData,:) = [];
-pFit.sim2dat = dataSpc;
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %% Determine data and model relation
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% rmXData = [];  % List of dataSpcs to remove due to not having all species in the model.
+% 
+% % Loop through experimental species
+% for ii = 1:size(dataSpc,1)
+% 	% Loop through attached model state
+% 	dataSpcTmp = zeros(size(dataSpc{ii,2}));
+% 	for jj = 1:length(dataSpc{ii,2})
+% 		
+% 		% Determine if complex of model species needs to be included.
+% 		% model species with start in them will have enzyme-substrate
+% 		% complex included (flat -1).
+% 		if strcmp(dataSpc{ii,2}{jj}(1),'*')
+% 			incComp = -1;
+% 			dataSpc{ii,2}{jj}(1) = [];
+% 		else
+% 			incComp = 1;
+% 		end
+% 		
+% 		% Get species name index
+% 		[~,~,indx]  = intersect(upper(dataSpc{ii,2}{jj}),upper(conc.name));
+% 		
+% 		% If required model species not in the simulation. Print warning and then exclude
+%         if isempty(indx)
+% 			storeError(model,[],[],[],['The state ' dataSpc{ii,2}{jj} ' required as an experimental equivalent state not found. This experimental state will be excluded from curve fitting'])
+%             rmXData = ii;
+% 			break
+% 		end
+% 		
+% 		% Store index of model species including flag of whether to include
+% 		% enzyme-substrate complex or not.
+% 		dataSpcTmp(jj) = incComp*indx;
+% 	end
+% 	dataSpc{ii,2} = dataSpcTmp;
+% end
+% dataSpc(rmXData,:) = [];
+% pFit.sim2dat = dataSpc;
 
 %% Compile output
-model.conc = conc;
+model.modSpc = modSpc;
 model.pFit = pFit;
 model.param = param;
-model.comp = comp;
+model.modComp = modComp;
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%End Main Function%%%%%
@@ -346,35 +333,10 @@ end
 function param = contractTens(param,ind)
 	paramFields = fieldnames(param);
 	for jj = 1:length(paramFields)
-		if ~ismember(paramFields{jj},{'name'}) % Fields to not expand on contract
+		if ~ismember(paramFields{jj},{'name','npar','grp'}) % Fields to not expand or contract
 			tmpTens = param.(paramFields{jj});
 			tmpTens(ind,:) = [];
 			param.(paramFields{jj}) = tmpTens;
 		end
 	end
-end
-
-%%%%%%%%%%%%%%%%%%%%%
-function [pFit,param,paramGrp,curParInd,putParInd] = procFreeParam(pFit,curParInd,parDesc,param,custBnd,defBnd,paramGrp,grp)
-
-if ~all(grp~=paramGrp(:,1))            %%existing group of free parameters
-	putParInd = paramGrp(grp==paramGrp(:,1),2);
-else                             %% ungrouped or new group of free parameter
-	curParInd = curParInd + 1; % New parameter required
-
-	%Make new group
-	if grp ~= 0                  
-		paramGrp(end+1,:) = [grp curParInd];
-	end
-
-	% Set parameter boundary
-	if ~isempty(custBnd)       %% If there is custom set boundary
-		pFit.lim(curParInd,:) = custBnd;
-	else                             %% Else use default boundary
-		pFit.lim(curParInd,:) = defBnd;
-	end
-	pFit.desc{curParInd}	= parDesc;
-	putParInd = curParInd;
-end
-	
 end
