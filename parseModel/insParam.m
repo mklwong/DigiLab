@@ -25,7 +25,8 @@ for ii = 1:length(model.param)
 	modelOut.param(ii).name   = model.param(ii).name;
 end
 
-[modelOut,modelRamp] = model.rxnRules(modelOut,tspan);
+modelRamp = model.rxnRules('compile',modelOut,[0 0]);
+modelOut = model.rxnRules('compile',modelOut,tspan);
 
 [~,ii] = intersect({modelOut.param.name},'k0');
-modelOut.fullSigma = @(t) normInp(t) + modelOut.param{ii}*ones(1,length(t)); 
+modelOut.sigma = @(t) normInp(t) + modelOut.param(ii).matVal*ones(1,length(t)); 

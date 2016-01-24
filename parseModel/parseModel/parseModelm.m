@@ -156,7 +156,7 @@ param = expandTens(param);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for ii = 1:size(modComp)
 	% Process parameter
-    [modComp(ii),pInd,pFit] = testPar2(modComp(ii),pFit);
+    [modComp(ii),pInd,pFit] = testPar(modComp(ii),pFit);
 	
     if ~isnan(pInd(2))
         parDesc = ['Comp : ' modComp(ii).name];
@@ -177,7 +177,7 @@ modComp = tmpComp;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for ii = 1:size(modSpc)
 	% Process parameter
-    [modSpc(ii),pInd,pFit] = testPar2(modSpc(ii),pFit);
+    [modSpc(ii),pInd,pFit] = testPar(modSpc(ii),pFit);
 	
     if ~isnan(pInd(3))
         parDesc = ['Conc : ' modSpc(ii).name];
@@ -206,7 +206,7 @@ BndCell = [fieldnames(Bnd) struct2cell(Bnd)];
 for ii=1:length(rxn)
 	
 	%% Determine if parameters are free or not
-    [rxn(ii),pInd,pFit] = testPar2(rxn(ii),pFit);
+    [rxn(ii),pInd,pFit] = testPar(rxn(ii),pFit);
 	
 	%% Turn reactions into maths using reaction rules
     [reqParam,matVal,pBuild,parDesc,modSpc] = model.rxnRules('rxnRules',rxn(ii),modSpc,flags,ii);

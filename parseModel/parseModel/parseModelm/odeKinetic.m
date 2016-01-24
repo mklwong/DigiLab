@@ -282,32 +282,47 @@ prodVec = ones(size(prodIndx));
 case 'compile'
 % Require inputs are:   [model,tspan]
 % Required outputs are: [model]	
-if nargin == 2
+if length(varargin) == 2
 	[model,tspan] = varargin{:};
-elseif nargin == 1
+elseif length(varargin) == 1
 	model = varargin{:};
 	tspan = [0 1]; %no non-dimensionalise
 end
 
-modelOut(1) = model;
-modelOut(2) = model;
-
 for ii = 1:length(model.param)
 	switch lower(model.param(ii).name)
 		case 'k0'
-			[modelOut(1).param(ii).matVal,modelOut(2).param(ii).matVal] = nonDim(model.param(ii).matVal,tspan,1);
+			model.param(ii).matVal = nonDim(model.param(ii).matVal,tspan,1);
+            tmpVec = zeros(length(model.modSpc),1);
+            tmpVec(model.param(ii).matVal(:,1)) = model.param(ii).matVal(:,2);
+            model.param(ii).matVal = tmpVec;
 		case 'k1'
-			[modelOut(1).param(ii).matVal,modelOut(2).param(ii).matVal] = nonDim(model.param(ii).matVal,tspan,4);		
+			model.param(ii).matVal = nonDim(model.param(ii).matVal,tspan,4);	
+            model.param(ii).matVal(:,3) = model.comp(model.param(ii).matVal(:,2)).*model.param(ii).matVal(:,4).*model.param(ii).matVal(:,3);
+            model.param(ii).matVal(:,4) = [];
+            model.param(ii).matVal = sparse(model.param(ii).matVal(:,1),model.param(ii).matVal(:,2),model.param(ii).matVal(:,3));
+            if ~all(size(model.param(ii).matVal)==length(model.modSpc))
+                model.param(ii).matVal(length(model.modSpc),length(model.modSpc))=0;
+            end
 		case 'k2'
-			[modelOut(1).param(ii).matVal,modelOut(2).param(ii).matVal] = nonDim(model.param(ii).matVal,tspan,5);
-		case 'Km'
-			
-		case 'Hill'
-			[modelOut(1).param(ii).matVal,modelOut(2).param(ii).matVal] = nonDim(model.param(ii).matVal,tspan,5);
+			model.param(ii).matVal = nonDim(model.param(ii).matVal,tspan,5);
+            compUsed = min(model.comp(model.param(ii).matVal(:,[2 3])),[],2);
+            model.param(ii).matVal(:,4) = compUsed.*model.param(ii).matVal(:,5).*model.param(ii).matVal(:,4);
+            model.param(ii).matVal(:,5) = [];
+		case 'km'
+			compUsed = min(model.comp(model.param(ii).matVal(:,[2 3])),[],2);
+            model.param(ii).matVal(:,4) = model.comp(model.param(ii).matVal(:,1)).*model.param(ii).matVal(:,5)./(compUsed.*model.param(ii).matVal(:,4));
+            model.param(ii).matVal(:,5) = [];
+		case 'hill'
+            % go from [ind1 ind2 ind3 r k Km n] to [ind1 ind2 ind3 r*k*V Km n]
+			model.param(ii).matVal = nonDim(model.param(ii).matVal,tspan,5);
+            compUsed = min(model.comp(model.param(ii).matVal(:,[2 3])),[],2);
+            model.param(ii).matVal(:,4) = compUsed.*model.param(ii).matVal(:,4).*model.param(ii).matVal(:,5);
+            model.param(ii).matVal(:,5) = [];
 		end
 end
 
-varargout = {modelOut,modelRamp};
+varargout = {model};
 
 case 'dyneqn'
 %% Dynamic Equation construction
@@ -316,36 +331,43 @@ case 'dyneqn'
 
 [t,x,model] = varargin{:};
 
+try
+% ~~Finding indices of matrices~~
+[~,matInd] = ismember({model.param.name},{'k1','k2','Km','Hill'});
+
 % ~~Initialise matrices~~
-G = zeros(size(model.tens{3}));
-HillTerm = ones(size(model.tens{3}));
+G = zeros(length(model.modSpc));
+V = G;
+HillTerm = G;
 
-% ~~Hill function tensor construction~~
-ii = find(cellfun(@iscell,model.tensName));
-jj = cellfun(@length,model.tensName(ii));
-HillTens = model.tens{ii(jj==3)};
-HillTensName = model.tensName{ii(jj==3)};
-[~,kk] =intersect(HillTensName,{'k1MM','KmMM','Hill_n'});
-%HillMat = HillTens{kk(1)}(:,3).*HillTens{kk(2)(;
+% ~~Construction of k1 matrix~~
+WInd = find(matInd==1);
+W = model.param(WInd).matVal;
 
-model.run.tensor.M5(:,4) = min(compVal(model.run.tensor.M5(:,2:3)),[],2).*...
-						   model.run.tensor.M5(:,4).*(x(model.run.tensor.M7(:,3)).^model.run.tensor.M7(:,4))./...
-						   (model.run.tensor.M6(:,4)+x(model.run.tensor.M7(:,3)).^model.run.tensor.M7(:,4));
-MTmp = sparse(model.run.tensor.M1(:,1),model.run.tensor.M1(:,2),min(compVal(model.run.tensor.M1(:,[2 3])),[],2).*x(model.run.tensor.M1(:,3))./(compVal(model.run.tensor.M1(:,1)).*model.run.tensor.M1(:,4)));
+% ~~Construction of k2 matrix~~
+VInd = find(matInd==2);
+VTmp = sparse(model.param(VInd).matVal(:,1),model.param(VInd).matVal(:,2),x(model.param(VInd).matVal(:,3)).*model.param(VInd).matVal(:,4));
+[a,b] = size(VTmp);
+V(1:a,1:b) = VTmp;
 
-[a,b] = size(MTmp);
-M(1:a,1:b) = MTmp;
+% ~~Construction of G matrix~~
+GInd = find(matInd==3);
+GTmp = sparse(model.param(GInd).matVal(:,1),model.param(GInd).matVal(:,2),x(model.param(GInd).matVal(:,3))./model.param(GInd).matVal(:,4));
+[a,b] = size(GTmp);
+G(1:a,1:b) = GTmp;
 
-LTmp = sparse(model.run.tensor.M2(:,1),model.run.tensor.M2(:,2),model.run.tensor.M2(:,4).*x(model.run.tensor.M2(:,3)).*min(compVal(model.run.tensor.M2(:,2:3)),[],2));
-[a,b] = size(LTmp);
-G(1:a,1:b) = LTmp;
-
-HillTerm = sparse(model.run.tensor.M5(:,1),model.run.tensor.M5(:,2),model.run.tensor.M5(:,4));
-[a,b] = size(HillTerm);
-HillTerm(1:a,1:b) = HillTerm;
+% ~~Construction of HillFun matrix~~
+HillInd = find(matInd==4);
+HillRatio = (x(model.param(HillInd).matVal(:,3))./model.param(HillInd).matVal(:,5)).^model.param(HillInd).matVal(:,6);
+HillVal = model.param(HillInd).matVal(:,4).*HillRatio./(HillRatio+1);
+HillTmp = sparse(model.param(HillInd).matVal(:,1),model.param(HillInd).matVal(:,2),HillVal);
+[a,b] = size(HillTmp);
+HillTerm(1:a,1:b) = HillTmp;
 
 % Solve
-varargout{1} = (eye(length(x))+M)\((L*x+(model.tens{3}+HillTerm)*x+k0(t))./compVal);
-
+varargout{1} = (eye(length(x))+G)\((V*x+(W+HillTerm)*x+model.sigma(t).*model.comp)./model.comp);
+catch msg
+    keyboard
+end
 
 end

@@ -1,8 +1,10 @@
 function Y = compDis(model,Y)
 
 % Y2 = compDis(Y,G)
-x = model.modSpc.matVal;
-G = model.param(1).matVal;
+x = model.modSpc;
+[~,kmInd] = ismember({model.param.name},'Km');
+kmInd = find(kmInd);
+G = model.param(kmInd).matVal;
 
 if ~isempty(G)
 	% Remove the terms which correlate with change in enzyme/substrate
@@ -19,7 +21,7 @@ if ~isempty(G)
 	G = G(I,:);
 
 	M = eye(size(x,1));
-	scale = model.comp.tens(model.conc.comp);
+	scale = model.comp;
 	scale = scale(:,ones(1,length(scale)));
 	M((G(:,2)-1)*max(G(:,1))+G(:,1))=1;
 	Y = Y*(M.*scale);

@@ -74,9 +74,9 @@ end
 
 % Create initial concentration vector
 if isempty(x0)
-	x0 = modelRaw.conc.tens;
-elseif size(x0,1) ~= size(modelRaw.conc.tens)
-	x0(length(modelRaw.conc.tens)) = 0;
+	x0 = modelRaw.modSpc.matVal;
+elseif size(x0,1) ~= size(modelRaw.modSpc.matVal)
+	x0(length(modelRaw.modSpc.matVal)) = 0;
 end
 
 %% Determining input values
@@ -86,7 +86,7 @@ inpFun = @(t)zeros(length(x0),1);
 % This component looks at the experiment-simulation name pair, then
 % compares the experiment name with the name given in the 
 if iscell(tmpInp) %state name-val pair
-	protList = modelRaw.conc.name;
+	protList = modelRaw.modSpc.name;
 	inpFunInd = [];
 	inpConstInd = [];
 	for ii = 1:size(tmpInp,1)
@@ -150,7 +150,7 @@ end
 %% non-dimensionalisation of time
 normInp = @(t) inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1)); %non-dimensionalise inp;
 
-[modelOut,modelRamp] = modelRaw.rxnRules('insparam',modelRaw,p,tspan,normInp);
+[modelOut,modelRamp] = insParam(modelRaw,p,tspan,normInp);
 
 %ODE Solver options and warning
 if ~exist('options','var')
@@ -184,7 +184,7 @@ if ~noBasal
 	modelOut.sigma = @(t) modelOut.sigma(t) + inpConst*2*normpdf(t,0,1e-6);
 end
 
-dx_dt = @(t,x) modelOut.rxnRules('dynEqn',t,x,modelOut);
+dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelOut);
 [t,Y] = ode15s(dx_dt,[0 1],y0,options);
 
 t = t*(tspan(end)-tspan(1))+tspan(1); %Restore to original units
