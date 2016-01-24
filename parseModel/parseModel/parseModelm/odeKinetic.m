@@ -276,92 +276,36 @@ prodVec = ones(size(prodIndx));
                             {'','','','r','k','Km','n'}};
 	end
 	varargout = {reqTens,matVal,pBuild,paramDesc,modSpc};
+	
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-case 'insparam'
-% Require inputs are:   [model,p]
+
+case 'compile'
+% Require inputs are:   [model,tspan]
 % Required outputs are: [model]	
-[model,p,tspan,normInp] = varargin{:};
-
-% Putting concentration into tensors
-freeInd = find(~isnan(model.conc.pInd));
-concVals = model.conc.tens;
-if ~isempty(freeInd)
-	concVals(freeInd,end) = model.conc.tens(freeInd,end).*p(model.conc.pInd(freeInd));
-end
-modelOut.conc = concVals;
-
-% Putting compartments into tensors
-freeInd = find(~isnan(model.comp.pInd));
-compVals = model.comp.tens;
-if ~isempty(freeInd)
-	compVals(freeInd,end) = model.comp.tens(freeInd,end).*p(model.comp.pInd(freeInd));
-	compVals = compVals(model.conc.comp);
+if nargin == 2
+	[model,tspan] = varargin{:};
+elseif nargin == 1
+	model = varargin{:};
+	tspan = [0 1]; %no non-dimensionalise
 end
 
-% Putting param into tensors and putting in compartmentalisation values 
-x0 = modelOut.conc;
-kk = 1;
+modelOut(1) = model;
+modelOut(2) = model;
+
 for ii = 1:length(model.param)
-	[~,hillInd] = intersect({model.param.name},{'k1MM','KmMM','Hill_n'});
-	
-	freeIndVal = ~isnan(model.param(ii).pInd);
-	freeIndGeo = ~isnan(model.param(ii).pIndGeo);
-	tmpVals = model.param(ii).rateVal;
-	tmpGeo  = model.param(ii).geoVal;
-	tmpVals(freeIndVal,end) = model.param(ii).rateVal(freeIndVal,end).*p(model.param(ii).pInd(freeIndVal));
-	tmpGeo (freeIndGeo,end) = model.param(ii).geoVal(freeIndGeo,end).*p(model.param(ii).pIndGeo(freeIndGeo));
-	tmpGeo(~freeIndGeo,end) = 1;
-	
-	
-	if strcmpi(model.param(ii).name,'km')
-		minComp = min(compVals(tmpVals(:,[2 3])),[],2);
-		tmpVals(:,end) = minComp.*tmpGeo./(tmpVals(:,end).*compVals(tmpVals(:,3)));
-		tmpRamp = tmpVals;
-	elseif all(hillInd~=ii) || strcmpi(model.param(ii).name,'k1MM')
-		tmpVals(:,end) = tmpVals(:,end).*tmpGeo*(tspan(end)-tspan(1));
-		tmpRamp = tmpVals;
-		tmpRamp(:,end) = tmpVals(:,end)*0;
-	else
-		tmpRamp = tmpVals;		
-	end
-	
-	% Pre-generate full matrix if possible
-	if size(model.param(ii).rateVal,2)==2
-		tmpVals = full(sparse(tmpVals(:,1),ones(size(tmpVals(:,1))),tmpVals(:,2)));
-		if length(tmpVals)~= length(x0)
-			tmpVals(size(x0,1),1) = 0;
+	switch lower(model.param(ii).name)
+		case 'k0'
+			[modelOut(1).param(ii).matVal,modelOut(2).param(ii).matVal] = nonDim(model.param(ii).matVal,tspan,1);
+		case 'k1'
+			[modelOut(1).param(ii).matVal,modelOut(2).param(ii).matVal] = nonDim(model.param(ii).matVal,tspan,4);		
+		case 'k2'
+			[modelOut(1).param(ii).matVal,modelOut(2).param(ii).matVal] = nonDim(model.param(ii).matVal,tspan,5);
+		case 'Km'
+			
+		case 'Hill'
+			[modelOut(1).param(ii).matVal,modelOut(2).param(ii).matVal] = nonDim(model.param(ii).matVal,tspan,5);
 		end
-		tmpRamp = tmpVals*0;
-	elseif size(model.param(ii).rateVal,2)==3 && ~strcmpi(model.param(ii).name,'k1MM')
-		tmpVals = full(sparse(tmpVals(:,1),tmpVals(:,2),tmpVals(:,3)));
-		if (size(tmpVals,1)~= length(x0) || size(tmpVals,2)~= length(x0))
-			tmpVals(size(x0,1),size(x0,1)) = 0;
-		end
-		tmpRamp = tmpVals*0;
-	end
-	
-	tens{kk} = tmpVals;
-	tensRamp{kk} = tmpRamp;
-	tensName{kk} = model.param(kk).name;
-	clear tmpRamp tmpVals
-	kk = kk + 1;
 end
-
-tens{min(hillInd)} = tens(hillInd);
-tensRamp{min(hillInd)} = tensRamp(hillInd);
-tensName{min(hillInd)} = tensName(hillInd);
-hillInd(hillInd==min(hillInd)) = [];
-tens(hillInd) = [];
-tensName(hillInd) = [];
-
-%combine hill parameters
-modelOut.tensName = tensName;
-modelOut.tens = tens;
-modelRamp = modelOut;
-modelRamp.tens = tensRamp;
-
-[~,ii] = intersect({model.param.name},'k0');
-modelOut.fullSigma = @(t) normInp(t) + modelOut.tens{ii}*ones(1,length(t)); 
 
 varargout = {modelOut,modelRamp};
 

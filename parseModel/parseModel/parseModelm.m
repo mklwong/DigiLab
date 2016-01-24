@@ -228,6 +228,8 @@ for ii=1:length(rxn)
     for jj = 1:length(reqParam);
 		%Make param builder
         pIndBuild = nan(size(pBuild{jj}));
+		[~,pBuild2Params] = ismember(pBuild{jj},fieldnames(rxn(ii))); % parDesc to pInd mapping
+		pIndBuild(pBuild2Params~=0) = 0;
         [~,pBuild2pInd] = ismember(pBuild{jj},parDesc(:,1)); % parDesc to pInd mapping
         pIndBuild(pBuild2pInd~=0) = pInd(pList2Desc((pBuild2pInd(pBuild2pInd~=0))));
         pIndBuild = pIndBuild(ones(1,size(matVal{jj},1)),:);

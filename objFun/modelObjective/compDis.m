@@ -1,8 +1,8 @@
 function Y = compDis(model,Y)
 
 % Y2 = compDis(Y,G)
-x = model.conc.tens;
-G = model.param(1).rateVal;
+x = model.modSpc.matVal;
+G = model.param(1).matVal;
 
 if ~isempty(G)
 	% Remove the terms which correlate with change in enzyme/substrate
