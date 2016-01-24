@@ -4,7 +4,7 @@
 %
 % spcComp = {'Compartment name', relative size};
 %
-spcComp = {'Cyto', NaN;
+modComp = {'Cyto', NaN;
            'Cyto2' NaN};
 
 %% Model species definition
@@ -29,6 +29,9 @@ Bnd.k1  = [5e-5 5e-1];
 Bnd.k2   = [5e-5 5e-1];
 Bnd.Km   = [1e-2 1e02];
 Bnd.Conc = [1e-1 1e1];
+Bnd.n   = [1 4];
+Bnd.Comp = [0 1];
+Bnd.r    = [0 1];
 
 %% Reactions
 % Reactions are stored in the variable rxn. Each reaction has
