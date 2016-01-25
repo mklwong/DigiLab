@@ -4,17 +4,19 @@
 %
 % spcComp = {'Compartment name', relative size};
 %
-modComp = {'Cyto', NaN;
-           'Cyto2',NaN};
+modComp = {'Cyto1', NaN;
+           'Cyto2', NaN;
+		   'Cyto3', NaN;
+		   'Cyto4', NaN};
 
 %% Model species definition
 %
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
-modSpc = {'A'         ,'Cyto'  , 1;
-		  'C'         ,'Cyto'  , 1;
-          'B'         ,'Cyto2' , 0;
-          'D'         ,'Cyto2' , 1};
+modSpc = {'A'         ,'Cyto1' , 1;
+		  'C'         ,'Cyto2' , 1;
+          'B'         ,'Cyto3' , 0;
+          'D'         ,'Cyto4' , 1};
 
 %% Relationship between simulation state and model state association
 
@@ -60,7 +62,7 @@ rxn(end+1).desc = 'B -> A | D';
     rxn(end).enz = 'D';
     rxn(end).k   = NaN; 
     rxn(end).Km  = NaN; 
-% rxn(end+1).desc = 'B -> A';
-%     rxn(end).sub = 'B';  
-%     rxn(end).prod = 'A'; 
-%     rxn(end).k   = NaN;
+rxn(end+1).desc = 'B -> A';
+    rxn(end).sub = 'B';  
+    rxn(end).prod = 'A'; 
+    rxn(end).k   = NaN;

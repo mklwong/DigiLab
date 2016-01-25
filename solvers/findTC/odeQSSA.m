@@ -165,10 +165,10 @@ if ~noRamp
 	if noBasal
 		%Do not basal the time course. Set all rate parameters to zero.
 		modelRamp.sigma = @(t) (inpConst+x0)*2*normpdf(t,0,0.2);
-		modelRamp = modelRaw.rxnRules('ramp',modelRamp);
 	else
 		%Initial basal
 		%Enter the single input at the end of the time course
+		modelRamp = modelOut;
 		modelRamp.sigma = @(t) x0*2*normpdf(t,0,0.2);
 	end
 	dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelRamp);

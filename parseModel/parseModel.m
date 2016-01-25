@@ -40,7 +40,7 @@ if ischar(modelname)
 	modelname = str2func(modelname);
 elseif isstruct(modelname)
 	model = modelname;
-	if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'conc') && isfield(model,'pFit') && isfield(model,'param')
+	if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'modSpc') && isfield(model,'pFit') && isfield(model,'param') && isfield(model,'modComp')
 		%Model structure detected
 		modelname = str2func(model.name);
 	else

@@ -3,7 +3,7 @@ function [modelOut,modelRamp] = insParam(model,p,tspan,normInp)
 % Putting concentration into tensors
 freeInd = model.modSpc.pInd>0;
 concVals = model.modSpc.matVal;
-if ~isempty(freeInd)
+if any(freeInd~=0)
 	concVals(freeInd,end) = model.modSpc.matVal(freeInd,end).*p(model.modSpc.pInd(freeInd));
 end
 modelOut.modSpc = concVals;
@@ -11,11 +11,13 @@ modelOut.modSpc = concVals;
 % Putting compartments into tensors
 freeInd = model.modComp.pInd>0;
 compVals = model.modComp.matVal;
-if ~isempty(freeInd)
+if any(freeInd~=0)
 	compVals(freeInd,end) = model.modComp.matVal(freeInd,end).*p(model.modComp.pInd(freeInd));
-	compVals = compVals(model.modSpc.comp);
 end
-modelOut.comp = compVals;
+modSpcComp = model.modSpc.comp;
+modSpcComp(modSpcComp>0) = compVals(modSpcComp(modSpcComp>0));
+modSpcComp(modSpcComp==0) = NaN;
+modelOut.comp = min(modSpcComp,[],2);
 
 for ii = 1:length(model.param)
 	freeInd = model.param(ii).pInd>0;

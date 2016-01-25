@@ -187,10 +187,15 @@ for ii = 1:size(modSpc)
     
     modSpc(ii).pInd = pInd(3);
 end
-% Constract modComp
+
+% Contract modComp
 tmpSpc.name   = vertcat({modSpc.name});
 [~,tmpSpc.comp] = ismember(vertcat({modSpc.comp}),modComp.name);
 tmpSpc.comp = tmpSpc.comp';
+tmpSpc.comp = [tmpSpc.comp tmpSpc.comp*0]; %expand complex vector by 1 
+                                           %column. For complex species 
+										   %which have no defined reference
+										   %species yet.
 tmpSpc.matVal = vertcat(modSpc.matVal);
 tmpSpc.pInd   = vertcat(modSpc.pInd);
 
@@ -237,7 +242,11 @@ for ii=1:length(rxn)
         %Append both into their required pre-matrices
         [~,paramInd,~] = intersect(paramNames,reqParam{jj});
         matInd = find(isnan(param(paramInd).matVal(:,1)),1,'first');
-        param(paramInd).matVal(matInd:(matInd+size(matVal{jj},1)-1),:) = matVal{jj};
+		try
+			param(paramInd).matVal(matInd:(matInd+size(matVal{jj},1)-1),:) = matVal{jj};
+		catch msg
+			keyboard
+		end
         param(paramInd).pInd(matInd:(matInd+size(matVal{jj},1)-1),:)   = pIndBuild;
     end
     

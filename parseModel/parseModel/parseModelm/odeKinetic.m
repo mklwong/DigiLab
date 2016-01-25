@@ -97,7 +97,19 @@ elseif length(testEnz) ~= length(rxn.enz)
 	rxn.enz(end,end) = {'"'};
 	error('odeKinetic:EnzymeNotInSpeciesList',['Enzyme "' horzcat(rxn.enz{:,:}) ' missing in reaction with description: "' rxn.desc '"'])
 end
-%Change for legacy matlab versions
+
+% Make 1x0 vector if matrix is empty
+if isempty(subIndx)
+	subIndx = zeros(0,1);
+end
+if isempty(prodIndx)
+	prodIndx = zeros(0,1);
+end
+if isempty(enzIndx)
+	enzIndx = zeros(0,1);
+end
+
+% Change vector direction for legacy matlab versions
 if isrow(subIndx)
 	subIndx = subIndx';
 end
@@ -225,7 +237,7 @@ prodVec = ones(size(prodIndx));
 				%Make new complex species
 				compIndx = length(modSpc.name)+1;
 				modSpc.name{compIndx} = [modSpc.name{subIndx} '-' modSpc.name{enzIndx}];
-				modSpc.comp(compIndx) = modSpc.comp(subIndx); %Assume complex formed is in same compartment as substrate
+				modSpc.comp(compIndx,:) = modSpc.comp([subIndx enzIndx]); %Assume complex formed is in same compartment as substrate
 				modSpc.matVal(compIndx) = 0;
 				modSpc.pInd(compIndx) = NaN;
 
@@ -292,7 +304,7 @@ end
 for ii = 1:length(model.param)
 	switch lower(model.param(ii).name)
 		case 'k0'
-			model.param(ii).matVal = nonDim(model.param(ii).matVal,tspan,1);
+			model.param(ii).matVal = nonDim(model.param(ii).matVal,tspan,2);
             tmpVec = zeros(length(model.modSpc),1);
             tmpVec(model.param(ii).matVal(:,1)) = model.param(ii).matVal(:,2);
             model.param(ii).matVal = tmpVec;
@@ -311,7 +323,7 @@ for ii = 1:length(model.param)
             model.param(ii).matVal(:,5) = [];
 		case 'km'
 			compUsed = min(model.comp(model.param(ii).matVal(:,[2 3])),[],2);
-            model.param(ii).matVal(:,4) = model.comp(model.param(ii).matVal(:,1)).*model.param(ii).matVal(:,5)./(compUsed.*model.param(ii).matVal(:,4));
+            model.param(ii).matVal(:,4) = model.comp(model.param(ii).matVal(:,1)).*model.param(ii).matVal(:,5)./(model.param(ii).matVal(:,4).*compUsed);
             model.param(ii).matVal(:,5) = [];
 		case 'hill'
             % go from [ind1 ind2 ind3 r k Km n] to [ind1 ind2 ind3 r*k*V Km n]

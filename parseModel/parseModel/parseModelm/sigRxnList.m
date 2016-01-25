@@ -4,8 +4,8 @@ classdef sigRxnList
 		sub = cell(0,0);  
     	prod= cell(0,0); 
     	enz = cell(0,0);
+    	k  = []; 
 		Km = [];
-    	k  = [];  
 		r  = []; %Is 1 by default
 		n  = [];
 	end
