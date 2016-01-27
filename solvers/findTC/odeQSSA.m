@@ -57,11 +57,6 @@ for ii = 1:length(varargin)
 	end
 end
 
-%% Compile model if new one inserted
-if isrow(p)
-	p = p';
-end
-
 modelRaw = parseModel(modelRaw);
 
 % %Correct dimension of x0 and tspan
