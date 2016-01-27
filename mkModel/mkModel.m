@@ -13,6 +13,7 @@ if exist([name '.m'],'file')
         rePlc = input('No backup will be made. Are you sure (y/n)? ','s');
     end
     if strcmpi(rePlc,'n')
+		fpritnf('Opening existing file\n')
         open([name '.m'])
         return
     end
