@@ -16,7 +16,7 @@ switch type
         % Association:             k = [1 0 0]
         % MM Enzyme Kinetic:       k = [0 1 0]
         % MM enzyme Kinetic Deg:   k = [0 0 1]
-		vOverlap = min(v);
+		vOverlap = min(v(1:2));
         dx_dt(1) = -k(1)*x(1)*x(2)*vOverlap/v(1) - k(2)*x(1)*x(2)*vOverlap/v(1) - k(3)*x(1)*x(2)*vOverlap/v(1);
         dx_dt(2) = -k(1)*x(1)*x(2)*vOverlap/v(2);
         dx_dt(3) =  k(1)*x(1)*x(2)*vOverlap/v(2) + k(2)*x(1)*x(2)*vOverlap/v(2);
