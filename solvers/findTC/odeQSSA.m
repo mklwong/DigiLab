@@ -126,9 +126,9 @@ elseif isa(tmpInp,'function_handle') %vector of function handles
 	else
 		error('findTC:inpfunDimWrong','Dimensions of input function handle is wrong.')
 	end
-elseif size(tmpInp,2)==2             %Ind val pair
+elseif size(tmpInp,2)==2 && isnumeric(tmpInp)    %Ind val pair
 	inpConst(tmpInp(:,1)) = tmpInp(:,2);
-elseif min(size(tmpInp))==1          %vector of spiked final concentration
+elseif min(size(tmpInp))==1 && isnumeric(tmpInp) %vector of spiked final concentration
 	[a,b] = size(tmpInp);
 	if a == 1
 		tmpInp = tmpInp';
@@ -140,12 +140,19 @@ elseif min(size(tmpInp))==1          %vector of spiked final concentration
 	inpConst = [tmpInp;zeros(length(x0)-a,1)];
 elseif size(tmpInp,2)>2
 	error('odeQSSA:inpArrayDimWrong','Dimension of system input incorrect. Check your inputs')
+elseif ~isempty(tmpInp)
+	error('odeQSSA:inpArrayClassWrong','Class of external input function invalid. Check your inputs')
 end
 
 %% non-dimensionalisation of time
 normInp = @(t) inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1)); %non-dimensionalise inp;
 
 [modelOut,modelRamp] = insParam(modelRaw,p,tspan,normInp);
+
+% Replace x0 if not passed as an input
+if isempty(x0)
+	x0 = modelOut.modSpc;
+end
 
 %ODE Solver options and warning
 if ~exist('options','var')

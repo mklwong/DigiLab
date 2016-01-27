@@ -101,5 +101,5 @@ resid(11) = sum((YReal(:,1)-YMod(:,1))./(ones(length(tReal),1)*max(YReal(:,1))+e
 [k,kSSA,kSSA_r,xi,inp] = makeParam(0,1);
 xi(1) = 1;
 [tReal,YReal] = ode15s(@(t,x) ComplexMA(t,x,k,v(1:2)),[0 500],[xi zeros(1,10)]);
-[tMod,~,YMod] = findTC(@ComplexdQSSA,tReal,'p',[v(1:2) kSSA],'y0',xi,'-b');
-resid(12) = sum((YReal(:,1)-YMod(:,1))./(ones(length(tReal),1)*max(YReal(:,1))+eps));
+[tMod,Y,YMod] = findTC(@ComplexdQSSA,tReal,'p',[v(1:2) kSSA],'y0',xi,'-b');
+resid(12) = 10.^(-mean(-log10(abs(YReal(end,:)-YMod(end,:))./max([YReal(end,:);YMod(end,:)]))));
