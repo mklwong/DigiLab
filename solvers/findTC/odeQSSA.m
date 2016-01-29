@@ -67,16 +67,12 @@ if isrow(tspan)
     tspan = tspan';
 end
 
-% Create initial concentration vector
-if isempty(x0)
-	x0 = modelRaw.modSpc.matVal;
-elseif size(x0,1) ~= size(modelRaw.modSpc.matVal)
-	x0(length(modelRaw.modSpc.matVal)) = 0;
-end
+% Work out length of species
+nx = length(modelRaw.modSpc.matVal);
 
 %% Determining input values
-inpConst = zeros(length(x0),1);
-inpFun = @(t)zeros(length(x0),1);
+inpConst = zeros(nx,1);
+inpFun = @(t)zeros(nx,1);
 %Input values: make all into either function handles or vectors
 % This component looks at the experiment-simulation name pair, then
 % compares the experiment name with the name given in the 
@@ -101,7 +97,7 @@ if iscell(tmpInp) %state name-val pair
 	
 	%Insert constant values
 	inpConst(vertcat(tmpInp{inpConstInd,1})) = vertcat(tmpInp{inpConstInd,2});
-	inpFunCell = cell(length(x0),1);
+	inpFunCell = cell(nx,1);
 	inpFunCell(:) = {@(t)0};
 	inpFunCell(tmpInp{inpFunInd,1}) = tmpInp(inpFunInd,2);
 	inpFun = @(t) cellfun(@(f) f(t),inpFunCell);
@@ -112,14 +108,14 @@ elseif isa(tmpInp,'function_handle') %vector of function handles
 		if a~=1
 			error('findTC:inpfunDimWrong','Dimensions of input function handle is wrong.')
 		end
-		if b <= length(x0)
-			inpFun = @(t) [tmpInp(t)';zeros(length(x0)-b,1)];
+		if b <= nx
+			inpFun = @(t) [tmpInp(t)';zeros(nx-b,1)];
 		else
 			error('findTC:tooManyInpState','Too many input states in vector-val method.')
 		end
 	elseif b==1
-		if a <= length(x0)
-			inpFun = @(t) [tmpInp(t);zeros(length(x0)-a,1)];
+		if a <= nx
+			inpFun = @(t) [tmpInp(t);zeros(nx-a,1)];
 		else
 			error('findTC:tooManyInpState','Too many input states in vector-val method.')
 		end
@@ -134,10 +130,10 @@ elseif min(size(tmpInp))==1 && isnumeric(tmpInp) %vector of spiked final concent
 		tmpInp = tmpInp';
 		a = b;
 	end
-	if a > length(x0)
+	if a > nx
 		error('findTC:tooManyInpState','Too many input states in vector-val method.')
 	end
-	inpConst = [tmpInp;zeros(length(x0)-a,1)];
+	inpConst = [tmpInp;zeros(nx-a,1)];
 elseif size(tmpInp,2)>2
 	error('odeQSSA:inpArrayDimWrong','Dimension of system input incorrect. Check your inputs')
 elseif ~isempty(tmpInp)
