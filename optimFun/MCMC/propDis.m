@@ -15,14 +15,19 @@ end
 pt1 = 0*pt0;
 
 reRoll = true(size(pt0));
-n = 7; %scaling factor to turn range of randn to 1.
+n = 6; %scaling factor to turn range of randn to the width of the boundary.
 
+% Determine whether to use logarithmic scale to sample boundary or to use
+% linear
 bndRng = (bnd(:,2)-bnd(:,1));
-bndRng(isinf(bndRng)) = 1;
+bndRng(isinf(bndRng)) = 1; %Unbounded ones are set to 1
 
 %Determine scale
 logTest = log(bnd(:,2))-log(bnd(:,1));
-logScale = logTest>1&imag(logTest)==0;
+%          - magnitude of range > 1
+%          - magnitude of range non-imaginary (i.e. boundary crosses zero)
+%          - magnitude of range not infinity (i.e. one boundary IS zero)
+logScale = (logTest>1&imag(logTest)==0)&(~isinf(logTest));
 
 %%
 % Generate random variable. Undirected

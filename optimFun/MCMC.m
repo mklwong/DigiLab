@@ -209,6 +209,7 @@ fprintf_cust(outFileHandle,'-------------------------------\n\r');
 fprintf_cust(outFileHandle,'T = %1.2f | ',opts.T);
 fprintf_cust(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f \n\r',tNow(4:6));
 
+[~,logScale]= seedPt(runVar.bnd);
 
 %% Start loop
 while status == 1
@@ -238,10 +239,10 @@ while status == 1
 				runVar.bnd(:,2) = Inf;
 			end
 		else
-			if sum(runVar.bnd(:,1)==0 | isinf(runVar.bnd(:,2)))
+			if sum(isinf(-runVar.bnd(:,1)) | isinf(runVar.bnd(:,2)))
 				error('mcmc:unboundNoPrior','Cannot be run with no boundary when no prior is given')
-            end
-            ptTest = rand(size(runVar.bnd,1),1).*(runVar.bnd(:,2)-runVar.bnd(:,1))+runVar.bnd(:,1);
+			end
+            ptTest = seedPt(runVar.bnd);
             logPNew  = runVar.obj(ptTest);
             opts.resample = Inf;
         end % New candidate point
@@ -271,8 +272,6 @@ while status == 1
     %% Intermediate plotting of points (full display, only at single core mode)
     if ~opts.parMode && strcmpi(opts.disp,'full')
 		% Test Scale
-		logTest = log(runVar.bnd(:,2))-log(runVar.bnd(:,1));
-		logScale = logTest>1&imag(logTest)==0;
 		if ~logScale(1)
 			fordDirX = runVar.pt(1)+opts.basis(1)*opts.step(1);
 			RevDirX = runVar.pt(1)-opts.basis(1)*opts.step(1);
@@ -527,4 +526,27 @@ if isempty(h) && labindx == 1
 elseif ~isempty(h)
     out = fprintf(h,text,varargin{:});
 end
+end
+
+function [pt,logScale] = seedPt(bnd)
+
+% Determine whether to use logarithmic scale to sample boundary or to use
+% linear
+bndRng = (bnd(:,2)-bnd(:,1));
+bndRng(isinf(bndRng)) = 1; %Unbounded ones are set to 1
+
+%Determine scale
+logRng = log10(bnd(:,2))-log10(bnd(:,1));
+%          - magnitude of range > 1
+%          - magnitude of range non-imaginary (i.e. boundary crosses zero)
+%          - magnitude of range not infinity (i.e. one boundary IS zero)
+logScale = (logRng>1&imag(logRng)==0)&(~isinf(logRng));
+
+ptMidLin = ((bnd(:,2)-bnd(:,1))/2+bnd(:,1));
+ptMidLog = 10.^((log10(bnd(:,2))-log10(bnd(:,1)))/2+log10(bnd(:,1)));
+%%
+% Generate random variable. Undirected
+prop = (rand(size(bnd(:,1)))-0.5);
+pt(~logScale) = ptMidLin(~logScale)+prop(~logScale).*bndRng(~logScale);
+pt( logScale) = ptMidLog(logScale).*(10.^(prop(logScale).*logRng(logScale)));
 end
