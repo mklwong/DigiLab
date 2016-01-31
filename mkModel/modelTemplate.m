@@ -35,7 +35,7 @@
 % either compartments which we consider infinite in size. This would give 
 % the following.
 %
-spcComp = {'Cyto', 1;
+modComp = {'Cyto', 1;
            'PM'  , 0.05;
            'ES'  , Inf;
            };
@@ -58,45 +58,11 @@ spcComp = {'Cyto', 1;
 % mTORC2 is also included to phosphorylation AKT.
 % We would define this by:
 %
-modSpc = {'AKT'     ,'Cyto', NaN;
-          'mAKT'    ,'PM'  , 0;
+modSpc = {'AKT'     ,'Cyto', 0;
+          'mAKT'    ,'PM'  , NaN;
           'p473mAKT','PM'  , 0;
           'p473AKT' ,'Cyto', 0;
           'mTORC2'  ,'PM'  , 1};
-
-%% Relationship between simulation state and model state association
-
-% dataSpc = {'Exp State Name',{'Sim State Name 1','Sim State Name 2'}};
-
-% ~~~Guide~~~
-%
-% Overview: The way this is designed is each experiment state is
-% "constructed" from the simulated states. Thus one experimental states
-% maps to multiple simulated states.
-%
-% Specifics:
-% "Exp Name" is the name of the state as labelled in the experimental
-% data.
-%
-% "Sim State Name 1" and "Sim State Name 2" are the state names as labelled
-% in the simulation. The states included are summed together.
-%
-% An asterix (*) at the front of simulation state names implies the
-% implicit complexes for that state (calculated by not created explicitly
-% in xMod, such as ES complexes) are included as well.
-%
-%
-% ~~~Example~~~
-% Phosphorylation of p473AKT is experimental state to be compared. The
-% experiment is a Western Blot without cell fractionation, hence plasma
-% membrane and cytosolic AKT are captured. In our model the two pools of
-% AKT are discrete, hence the group of simulation states corresponding to
-% the experimental state are p473AKT and p473mAKT. Additionally, enzyme
-% substrate complexes for both the simulation states are included, so they
-% need to be asterixed.
-%
-% The final row for xData is hence:
- dataSpc = {'p473AKT',{'*p473AKT','*p473mAKT'}};
 
 %% Features of default parameters
 %
@@ -111,12 +77,19 @@ modSpc = {'AKT'     ,'Cyto', NaN;
 %   k2   - Second order associaition type
 %   Km   - Association/Dissociation/Michaelis constant type
 %   Conc - Concentration type
+%   n    - Hill coefficient
+%   r    - Geometry factor (defines effective fraction of overlap area that
+%                            is reactive in a cross compartment reaction)
+%   comp - Compartment size
 %
-Bnd.k0  = [1e01 1e04];
-Bnd.k1  = [5e-5 0.5];
+Bnd.k0   = [1e01 1e04];
+Bnd.k1   = [5e-5 0.5];
 Bnd.k2   = [5e-5 5e-1];
 Bnd.Km   = [1e-2 1e02];
 Bnd.Conc = [1e-1 1e1];
+Bnd.n    = [1 4];
+Bnd.r    = [0 1];
+Bnd.comp = [0 1];
 
 %% Reactions
 %
@@ -131,6 +104,8 @@ Bnd.Conc = [1e-1 1e1];
 %   - Prod     : List of products written as a cell array.
 %   - Enz      : Mediating enzyme
 %   - Km       : Michaelis Constant for enzymatic reaction. Is a parameter.
+%   - r        : Geometry factor
+%   - n        : Hill coefficient
 %   
 % Begin a new reaction by placing (end+1) after rxn. Continue a reaction by
 % placing (end) after rxn [The reason for this is due to programming. Just
@@ -139,24 +114,32 @@ Bnd.Conc = [1e-1 1e1];
 % The combination used for each reaction determines the rules used in the
 % backend of the program. This will be explained more later.
 %
-% For example, with an unknown Km and a known reaction rate of 0.1mol/s,
-% the phosphorylation of AKT at the membrane by mTORC2 can be written as:
+% For example the following reaction:
+% - Describes the enzymatic conversation of mAKT to p473mAKT by mTORC2
+% - The reaction is modelled with a hill function
+% - Reaction has an unknown Km and a known reaction rate of 0.1mol/s,
+% - "r" is an unknown parameter but is between 0.1 and 1.
+% - The hill coefficient is 3x the value of the geometry factor "r". So "n"
+%   and "r" are grouped together as parameter group 1.
 
-rxn(end+1).label = 'mAKT -> p473mAKT | mTORC2';
+rxn(end+1).desc = 'mAKT -> p473mAKT | mTORC2';
     rxn(end).sub = 'mAKT';  
     rxn(end).prod= 'p473mAKT'; 
     rxn(end).enz = 'mTORC2';
 	rxn(end).Km  = NaN; 
     rxn(end).k   = 0.1; 
+	rxn(end).r   = [NaN 1 0.1 1]; 
+	rxn(end).n   = [3 1]; 
 
  % More information on types of reactions:
  % If the fields (excluding label and k) are:
- %      - 1 Sub: Degradataion
- %      - 1 Sub, 1 Enz: Enzyme mediated degradataion
- %      - 1 Sub, 1 Prod : Transformation
- %      - 1 Sub, 2+ Prod: dissociation
- %      - 2 Sub, 1 Prod : Association 
- %      - 1 Prod: Constant synthesis
- %      - 1 Prod, 1 Enz: Enzyme mediated synthesis
- %      - 1 Sub, 1 Enz, Prod: Enzymatic reaction that can produce any 
- %        number of products
+ %      - 1 Sub               : Degradataion
+ %      - 1 Sub, 1 Enz        : Enzyme mediated degradataion
+ %      - 1 Sub, 1 Prod       : Transformation
+ %      - 1 Sub, 2+ Prod      : dissociation
+ %      - 2 Sub, 1 Prod       : Association 
+ %      - 1 Prod              : Constant synthesis
+ %      - 1 Prod, 1 Enz       : Enzyme mediated synthesis
+ %      - 1 Sub, 1 Enz, Prod  : Enzymatic reaction that can produce any 
+ %                              number of products
+ %		- n, Km and k included: Hill function

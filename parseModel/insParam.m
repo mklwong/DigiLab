@@ -1,5 +1,14 @@
 function [modelOut,modelRamp] = insParam(model,p,tspan,normInp)
 
+if length(p)<model.pFit.npar
+	error('insParam:insufficientParameters',['Not enough parameters passed. Parameter vector must be at least ' num2str(model.pFit.npar) ' elements long.'])
+end
+
+% Make p a column vector
+if isrow(p)
+	p = p';
+end
+
 % Putting concentration into tensors
 freeInd = model.modSpc.pInd>0;
 concVals = model.modSpc.matVal;

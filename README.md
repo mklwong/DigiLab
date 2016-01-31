@@ -1,4 +1,4 @@
-SignalMat
+SigMat
 =========
 
-Signalling Networks modelled in Matlab.
+Biochemical Signalling Networks modelled in Matlab.

@@ -343,7 +343,6 @@ case 'dyneqn'
 
 [t,x,model] = varargin{:};
 
-try
 % ~~Finding indices of matrices~~
 [~,matInd] = ismember({model.param.name},{'k1','k2','Km','Hill'});
 
@@ -378,8 +377,5 @@ HillTerm(1:a,1:b) = HillTmp;
 
 % Solve
 varargout{1} = (eye(length(x))+G)\((V*x+(W+HillTerm)*x+model.sigma(t).*model.comp)./model.comp);
-catch msg
-    keyboard
-end
 
 end

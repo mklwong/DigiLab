@@ -2,7 +2,7 @@ function [k,kSSA,kSSA_r,xi,inp] = makeParam(tInjStrt,tInjEnd)
 
 k = 10.^((rand(1,36)-0.5)*2);
 xiv = 10.^((rand(1,36)-0.5)*2);
-%k([1:7 17:end]) = 0;
+%k([8:end]) = 0;
 
 % Concentration rules
 xiv(4) = xiv(3)*(rand(1)+0.5); % Enforce concentration relationship between C and D
