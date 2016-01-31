@@ -115,13 +115,9 @@ if ischar(model)
 end
 
 % Initialise parameters
-model.rxnRules = rxnRules;
-param = model.rxnRules('ini');
 rxn = sigRxnList();
 v = rxn; %Legacy code. For backward compatibility.
-
 rxn(1) = []; %When rxn is initialised it always creates an empty reaction. Remove this.
-
 run(modelname); 
 %loads the following 
 %	- modComp: compartment info for model.
@@ -134,6 +130,22 @@ run(modelname);
 if size(v) > 1
     error('Please change all v in your model file into rxn. v no longer recognised as reaction network variable')
 end
+
+%Load Model Rules
+if ~exist('rateLaw','var')
+    model.rxnRules = rxnRules;
+else
+    if ischar(rateLaw)
+        rateLaw = str2func(rateLaw);
+    end
+    model.rxnRules = rateLaw;
+end
+
+%Check that model rule file exists
+if ~exist(func2str(model.rxnRules),'file')
+    error('parseModelm:rxnRuleFileNotFound','Specified rate law file not found. Please check the containing folder is in the MATLAB Path')
+end
+param = model.rxnRules('ini');
 
 %Convert all compartment and species arrays into structures
 modSpc = cell2struct(modSpc,{'name','comp','matVal'},2);
