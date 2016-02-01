@@ -89,7 +89,7 @@ Bnd.Km   = [1e-2 1e02];
 Bnd.Conc = [1e-1 1e1];
 Bnd.n    = [1 4];
 Bnd.r    = [0 1];
-Bnd.comp = [0 1];
+Bnd.Comp = [0 1];
 
 %% Reactions
 %

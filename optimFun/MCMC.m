@@ -481,7 +481,11 @@ end
 if ~isrow(pt0)
 	pt0 = pt0';
 end
+
 logP1 = runVar.obj(pt1);      % Obtain likelihood of proposed step
+if isnan(logP1)
+	logP1 = Inf;
+end
 
 % Metropolis Algorithm
 test = min([1 exp((logP0-logP1)/opts.T)/pdfBias]); % Calculate hastings term.

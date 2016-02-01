@@ -9,8 +9,7 @@ function model = parseModel(modelname,varargin)
 
 %% Function options
 Names = ['expComp  ';
-         'modelRule';
-		 'p        '];
+         'modelRule'];
 
 % Default options
 flag = true;
@@ -24,8 +23,6 @@ for ii = 1:length(varargin)
 				flag(1) = varargin{ii+1};
 			case lower(deblank(Names(2,:))) %model Rules
 				modelRules = varargin{ii+1};
-			case lower(deblank(Names(3,:))) %parameter value
-				p = varargin{ii+1};
 			case []
 				error('Expecting Option String in input');
 			otherwise
@@ -75,18 +72,6 @@ elseif strcmp(modType,'QSSA-m') || strcmp(modType,'QSSA-sbml')
 		else
 			error('findTC:modelNotFound','Model file not found. Only .xml or .m files accepted')
 		end
-	end
-	
-	% Impose passed parameter on reaction parameters if parameter given
-	if exist('p','var')
-		if isrow(p)
-			p = p';
-		end
-		p_num = size(model.pFit.lim,1);
-		if length(p)<p_num
-			error(['Insufficient number of parameters passed. ' num2str(p_num) ' is required ' num2str(length(p)) ' passed'])
-		end
-		model = model.rxnRules('insParam',model,p);
 	end
 else
 	error('modelObjective:badModelInput','Invalid model passed. Check inputs')
