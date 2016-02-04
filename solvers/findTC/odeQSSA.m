@@ -156,7 +156,8 @@ if ~exist('options','var')
 end
 warnstate('error')
 
-
+doInteg = true;
+norm_tspan = [0 1];
 %% Solving
 % Ramping
 if ~noRamp
@@ -170,7 +171,17 @@ if ~noRamp
 		modelRamp.sigma = @(t) x0*2*normpdf(t,0,0.2);
 	end
 	dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelRamp);
-	[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
+	try
+		[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
+	catch errMsg
+		if errDir 
+			storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
+		else
+			storeError(modelRaw,x0,p,errMsg,errMsg.message)
+		end
+		Y = nan(length(norm_tspan),length(x0));
+		doInteg = false;
+	end
 	y0 = Y(end,:)';
 	y0(y0<0) = 0;
 else
@@ -184,9 +195,8 @@ end
 
 dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelOut);
 
-doInteg = true;
+
 failedOnce = false;
-norm_tspan = [0 1];
 while doInteg
 	try
 		[t,Y] = ode15s(dx_dt,norm_tspan,y0,options);
