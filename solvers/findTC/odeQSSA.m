@@ -152,11 +152,11 @@ end
 
 %ODE Solver options and warning
 if ~exist('options','var')
-	options = odeset('relTol',9e-6,'NonNegative',ones(size(x0)));
+	options = odeset('relTol',1e-6,'NonNegative',ones(size(x0)));
 end
 warnstate('error')
 
-try
+
 %% Solving
 % Ramping
 if ~noRamp
@@ -183,7 +183,30 @@ if ~noBasal
 end
 
 dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelOut);
-[t,Y] = ode15s(dx_dt,[0 1],y0,options);
+
+doInteg = true;
+failedOnce = false;
+norm_tspan = [0 1];
+while doInteg
+	try
+		[t,Y] = ode15s(dx_dt,norm_tspan,y0,options);
+		doInteg = false;
+	catch errMsg
+		% Error catching
+		if failedOnce
+			t = [0 1];
+			if errDir 
+				storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
+			else
+				storeError(modelRaw,x0,p,errMsg,errMsg.message)
+			end
+			YComp = inf(length(norm_tspan),length(x0));
+		else
+			failedOnce = true;
+			norm_tspan = norm_tspan*1.5;
+		end
+	end
+end
 
 t = t*(tspan(end)-tspan(1))+tspan(1); %Restore to original units
 if length(tspan)>2
@@ -191,16 +214,6 @@ if length(tspan)>2
 	t = tspan;
 end
 YComp  = Y;
-catch errMsg
-%% Error catching
-	YComp = inf(length(tspan),length(x0));
-	t = tspan;
-	if errDir 
-		storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
-	else
-		storeError(modelRaw,x0,p,errMsg,errMsg.message)
-	end
-end
 Y = compDis(modelOut,YComp);      %dissociate complex
 warnstate('on') %Switch warnings back to warnings
 end

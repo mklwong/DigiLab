@@ -171,7 +171,7 @@ for ii = 1:size(modComp)
     [modComp(ii),pInd,pFit] = testPar(modComp(ii),pFit);
 	
     if ~isnan(pInd(2))
-        parDesc = ['Comp : ' modComp(ii).name];
+        parDesc = [num2str(pInd(2)) ' | Comp : ' modComp(ii).name];
         pFit.desc{pInd(2)} = parDesc;
         pFit.lim(pInd(2),:) = Bnd.Comp;
     end
@@ -192,7 +192,7 @@ for ii = 1:size(modSpc)
     [modSpc(ii),pInd,pFit] = testPar(modSpc(ii),pFit);
 	
     if ~isnan(pInd(3))
-        parDesc = ['Conc : ' modSpc(ii).name];
+        parDesc = [num2str(pInd(3)) ' | Conc : ' modSpc(ii).name];
         pFit.desc{pInd(3)} = parDesc;
         pFit.lim(pInd(3),:) = Bnd.Conc;
     end
@@ -237,7 +237,19 @@ for ii=1:length(rxn)
     % Account for grouped parameters that have popped up again. They need
     % to be skipped so "leading description" is not replaced.
     for jj = 1:length(pList2Desc)
-        pFit.desc{pInd(pList2Desc(jj))} = [pFit.desc{pInd(pList2Desc(jj))} ' | ' parDesc{jj,3}]; %Insert definition
+		if isempty(pFit.desc{pInd(pList2Desc(jj))})
+			pFit.desc{pInd(pList2Desc(jj))} = [num2str(pInd(pList2Desc(jj))) ' | ' parDesc{jj,3}]; %Insert definition
+		else
+			clear oldPad newPad
+			dummyStr = num2str(pInd(pList2Desc(jj)));
+			dummyStr(1:end) = ' ';
+			newStr = [dummyStr ' | ' parDesc{jj,3}];
+			wNew = length(newStr);
+			[hOld,wOld] = size(pFit.desc{pInd(pList2Desc(jj))});
+			oldPad(1:hOld,1:(max(0,wNew-wOld))) = ' '; 
+			newPad(1,1:(max(0,wOld-wNew))) = ' '; 
+			pFit.desc{pInd(pList2Desc(jj))} = [pFit.desc{pInd(pList2Desc(jj))} oldPad;newStr newPad];
+		end
     end
     
     % Loop through pre-matrices that require new additions and build the
