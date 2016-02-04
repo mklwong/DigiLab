@@ -34,6 +34,12 @@ if ~exist(dirLoc,'dir')
     mkdir(dirLoc);
 end
 
+if ~exist('labindex','builtin')
+	labindx = 1;
+else
+	labindx = labindex;
+end
+
 %% Generate error identity code
 errorID = floor(rand(1)*1000000);
 errorID = ['e' num2str(errorID)];
@@ -70,8 +76,8 @@ fprintf(h,'\r\n-----------------------------------------');
 fclose(h);
 
 %% Save state into error file
-if exist([dirLoc '/errors.mat'],'file')
-    load([dirLoc '/errors.mat']);
+if exist([dirLoc '/errors' num2str(labindx) '.mat'],'file')
+    load([dirLoc '/errors' num2str(labindx) '.mat']);
 else
 	errs = struct();
 end

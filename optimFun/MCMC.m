@@ -210,19 +210,20 @@ fprintf_cust(outFileHandle,'T = %1.2f | ',opts.T);
 fprintf_cust(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f \n\r',tNow(4:6));
 
 [~,logScale]= seedPt(runVar.bnd);
+reTest = true;
 
 %% Start loop
 while status == 1
-	
     %% New active point selection
     if mod(pt_n,opts.resample)==0 || ~isfield(runVar,'pt')
-        if ~isempty(opts.prior.pts)
+        if ~isempty(opts.prior.pts) && reTest
 			% Select new point from prior based on goodness of fit of the
 			% prior
             rngPt = rand(1);
 			newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
             ptTest = opts.prior.pts(newPtInd,:);
 			logPNew  = runVar.obj(ptTest);
+			reTest = false;
 		elseif isfield(opts,'pt0')
 			% If only a single prior point is given, do not jump around the
 			% parameter space by reseeding. Also do not put boundaries on
@@ -346,6 +347,7 @@ while status == 1
         ptLocal(pt_n,:) = runVar.pt;
         t2 = tic;
         stallWarn = 0;
+		reTest = True;
     end
 	
     %% Parallel mode packet send and receive
