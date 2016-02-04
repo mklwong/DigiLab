@@ -200,7 +200,7 @@ while doInteg
 			else
 				storeError(modelRaw,x0,p,errMsg,errMsg.message)
 			end
-			YComp = inf(length(norm_tspan),length(x0));
+			Y = nan(length(norm_tspan),length(x0));
 			doInteg = false;
 		else
 			failedOnce = true;
