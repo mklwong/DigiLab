@@ -201,6 +201,7 @@ while doInteg
 				storeError(modelRaw,x0,p,errMsg,errMsg.message)
 			end
 			YComp = inf(length(norm_tspan),length(x0));
+			doInteg = false;
 		else
 			failedOnce = true;
 			norm_tspan = norm_tspan*1.5;

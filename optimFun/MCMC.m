@@ -347,7 +347,7 @@ while status == 1
         ptLocal(pt_n,:) = runVar.pt;
         t2 = tic;
         stallWarn = 0;
-		reTest = True;
+		reTest = true;
     end
 	
     %% Parallel mode packet send and receive
