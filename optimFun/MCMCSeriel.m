@@ -56,19 +56,6 @@ else
 	error('Specified prior not found')
 end
 
-% Generate random string for run ID and create unique folder for run
-% results
-[~,sysName] = system('hostname');   % Get hostname for number generator
-sysName(end) = [];
-symChar  = ['a':'z' 'A':'Z' '0':'9'];        %possible symbols
-c = clock;
-rng('shuffle'); %shuffle the random generator
-
-runID = [num2str(c(3)) '-' num2str(c(2)) '_' num2str(c(4)) '-' num2str(c(5)) '_' sysName '_' symChar(randi(length(symChar),1,5))]; %random string of 5
-if ~exist([modelLoc '/' runID],'file')
-	mkdir(modelLoc,runID);                       %Make subdirectory
-end
-
 % If no prior, initialise.
 if ~exist('result','var')
     prir = struct();
@@ -79,6 +66,22 @@ else
     prir = result;
 	fprintf('prior entered.\n')
 end
+
+% Generate random string for run ID and create unique folder for run
+% results
+[~,sysName] = system('hostname');   % Get hostname for number generator
+sysName(end) = [];
+symChar  = ['a':'z' 'A':'Z' '0':'9'];        %possible symbols
+c = clock;
+rng('shuffle'); %shuffle the random generator
+
+timeNow = [num2str(c(3)) '-' num2str(c(2)) '_' num2str(c(4)) '-' num2str(c(5)) '_' sysName];
+runID = symChar(randi(length(symChar),1,5)); %random string of 5
+
+if ~exist([modelLoc '/' timeNow '_' runID],'file')
+	mkdir(modelLoc,[timeNow '_' runID]);                       %Make subdirectory
+end
+fprintf('Run ID is: %s \n',runID)
 
 %Determine Scheduler by power factor x^n. The stps-1 is because the last value
 %needs to be one, which corresponds to x^0. T vector goes from largest to

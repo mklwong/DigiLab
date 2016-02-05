@@ -174,6 +174,7 @@ if ~noRamp
 	try
 		[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
 	catch errMsg
+		t = [0 1];
 		if errDir 
 			storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
 		else
