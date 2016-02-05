@@ -76,12 +76,12 @@ c = clock;
 rng('shuffle'); %shuffle the random generator
 
 timeNow = [num2str(c(3)) '-' num2str(c(2)) '_' num2str(c(4)) '-' num2str(c(5)) '_' sysName];
-runID = symChar(randi(length(symChar),1,5)); %random string of 5
-
-if ~exist([modelLoc '/' timeNow '_' runID],'file')
-	mkdir(modelLoc,[timeNow '_' runID]);                       %Make subdirectory
+runStr = symChar(randi(length(symChar),1,5)); %random string of 
+runID = [timeNow '_' runStr];
+if ~exist([modelLoc '/' runID],'file')
+	mkdir(modelLoc,runID);                       %Make subdirectory
 end
-fprintf('Run ID is: %s \n',runID)
+fprintf('Run ID is: %s \n',runStr)
 
 %Determine Scheduler by power factor x^n. The stps-1 is because the last value
 %needs to be one, which corresponds to x^0. T vector goes from largest to
