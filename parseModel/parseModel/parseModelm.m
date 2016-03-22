@@ -108,28 +108,104 @@ function model = parseModelm(model,rxnRules,flags)
 %%%%%%%%%%%%%%%%%%%%%
 %% Import model file
 %%%%%%%%%%%%%%%%%%%%%
-if ischar(model)
-	modelname = model;
-	clear model
-	model.name = modelname;
-end
+modelname = model;
+clear model
+model.name = '';
 
-% Initialise parameters
-rxn = sigRxnList();
-v = rxn; %Legacy code. For backward compatibility.
-rxn(1) = []; %When rxn is initialised it always creates an empty reaction. Remove this.
-run(modelname); 
-%loads the following 
-%	- modComp: compartment info for model.
-%	- modSpc:  species infor for model
-%	- dataSpc: how data readout and model species are related
-%	- Bnd:	   default boundaries for parameter types
-%	- rxn:	   list of reactions of the model
+for ii = 1:length(modelname)
+	model.name = [model.name modelname{ii} '|'];
+	% Initialise parameters
+	rxn = sigRxnList();
+	rxn(1) = []; %When rxn is initialised it always creates an empty reaction. Remove this.
+	run(modelname{ii}); 
 
-% Legacy code
-if size(v) > 1
-    error('Please change all v in your model file into rxn. v no longer recognised as reaction network variable')
+	%loads the following 
+	%	- modComp: compartment info for model.
+	%	- modSpc:  species infor for model
+	%	- dataSpc: how data readout and model species are related
+	%	- Bnd:	   default boundaries for parameter types
+	%	- rxn:	   list of reactions of the model
+	
+	if ii == 1
+		modComp_all = modComp;
+		modSpc_all  = modSpc;
+		Bnd_all     = Bnd;
+		rxn_all     = rxn;
+	else
+		% Check for conflicts between models in compartments
+		[jj,kk] = ismember(modComp(:,1),modComp_all(:,1));
+		jj = find(jj);
+		kk(kk==0) = [];
+		misMatches = cell2mat(modComp(jj,2))~=cell2mat(modComp_all(kk,2)); % Identify where mismatches are
+		if any(misMatches)
+			misMatchNames = modComp(jj(misMatches),1);
+			misMatchNames(:,2) = {', '};
+			misMatchNames(end,2) = {''};
+			misMatchNames = misMatchNames';
+			warning(['The following compartments have clashing sizes: ' horzcat(misMatchNames{:}) '. Larger value has been chosen.'])
+			modComp_all(kk(misMatches),2) = num2cell(max([cell2mat(modComp(misMatches,2)) cell2mat(modComp_all(kk(misMatches),2))],[],2));
+		end
+		modComp(jj,:) = [];  % Remove matching duplicates
+		modComp_all = [modComp_all;modComp];
+		
+		% Check for conflicts between models in model species initial
+		% condition
+		[jj,kk] = ismember(modSpc(:,1),modSpc_all(:,1));
+		jj = find(jj);
+		kk(kk==0) = [];
+		misMatches = cell2mat(modSpc(jj,3))~=cell2mat(modSpc_all(kk,3)); % Identify where mismatches are
+		if any(misMatches)
+			misMatchNames = modSpc(jj(misMatches),1);
+			misMatchNames(:,2) = {', '};
+			misMatchNames(end,2) = {''};
+			misMatchNames = misMatchNames';
+			warning(['The following species have clashing initial conditions: ' horzcat(misMatchNames{:}) '. Larger value has been chosen.'])
+			modSpc_all(kk(misMatches),3) = num2cell(max([cell2mat(modSpc(misMatches,3)) cell2mat(modSpc_all(kk(misMatches),3))],[],2));
+		end
+		
+		% Find mismatches in compartment name
+		misMatches = ~ismember(modSpc(jj,2),modSpc_all(kk,2)); % Identify where mismatches are
+		if any(misMatches)
+			misMatchNames = modSpc(jj(misMatches),1);
+			misMatchNames(:,2) = {', '};
+			misMatchNames(end,2) = {''};
+			misMatchNames = misMatchNames';
+			error(['The following species have conflicting compartments: ' horzcat(misMatchNames{:}) ', in model: ' modelname{ii} '. Please fix and ensure they are consistent.'])
+		end
+		
+		modSpc(jj,:) = [];  % Remove matching duplicates
+		modSpc_all = [modSpc_all;modSpc];
+		
+		% Check for conflicts between models in boundary conditions
+		bndNames = fieldnames(Bnd);
+		bndAllNames = fieldnames(Bnd_all);
+		for jj = 1:length(bndAllNames)
+			[isMemb,membInd] = ismember(bndAllNames(jj),bndNames);
+			if isMemb
+				bndEqual = Bnd_all.(bndAllNames{jj}) == Bnd.(bndNames{membInd});
+				if ~all(bndEqual)
+					warning(['The following boundary: ' bndAllNames{jj} ', is inconsistent. Boundary encompassing both are set.'])
+					Bnd_all.(bndAllNames{jj}) = [min([Bnd_all.(bndAllNames{jj})(1) Bnd.(bndNames{membInd})(1)]) max([Bnd_all.(bndAllNames{jj})(2) Bnd.(bndNames{membInd})(2)])];
+				end
+			end
+		end
+		% Check for boundaries that are in new model but not in aggregated
+		% model
+		isMemb = find(~ismember(bndNames,bndAllNames));
+		for jj = 1:length(isMemb)
+			Bnd_all.(bndNames(jj)) = Bnd.(bndNames(jj));
+		end
+		
+		% Merge reaction list
+		rxn_all = [rxn_all rxn];
+
+	end
 end
+modComp = modComp_all;
+modSpc  = modSpc_all;
+Bnd     = Bnd_all;
+rxn     = rxn_all;
+model.name = model.name(1:end-1);
 
 %Load Model Rules
 if ~exist('rateLaw','var')

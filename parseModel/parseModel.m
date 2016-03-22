@@ -11,6 +11,7 @@ function model = parseModel(modelname,varargin)
 %
 %   The SigMat structure format looks like:
 %	model
+%		- .name     : original name of the model
 %		- .modSpc   : Information for the species in the system
 %			- .name   : Name of species
 %			- .matVal : matrix value pre-matrix
@@ -59,23 +60,36 @@ for ii = 1:length(varargin)
 	end
 end
 
-% Isolate model name
-if ischar(modelname)
-	%convert function handle to string
-	modelname = str2func(modelname);
-elseif isstruct(modelname)
-	model = modelname;
-	if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'modSpc') && isfield(model,'pFit') && isfield(model,'param') && isfield(model,'modComp')
-		%Model structure detected
-		modelname = str2func(model.name);
-	else
-		%Unusual structure
-		error('parseModel:unexpectedModelType','Unexpected model type detected. Only strings, function handles or model structures allow')
-	end
+if iscell(modelname)
+	modelnameCell = modelname;
+else
+	modelnameCell{1} = modelname;
 end
-	 
-%% Kernel
 
+% Isolate model name and check that each are not pre-parsed structures
+for ii = 1:length(modelnameCell)
+	modelname = modelnameCell{ii};
+	if ischar(modelname)
+		%convert function handle to string
+		modelname = str2func(modelname);
+	elseif isstruct(modelname)
+		if length(modelnameCell)>1
+			error('parseModel:cannotCombineParsedModel','Currently proram not capable of combining parsed models. Feature will be incorporated in future versions')
+		end
+		model = modelname;
+		if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'modSpc') && isfield(model,'pFit') && isfield(model,'param') && isfield(model,'modComp')
+			%Model structure detected
+			modelname = str2func(model.name);
+		else
+			%Unusual structure
+			error('parseModel:unexpectedModelType','Unexpected model type detected. Only strings, function handles or model structures allow')
+		end
+	end
+	modelnameCell{ii} = modelname;
+end
+modelname = modelnameCell;
+
+%% Kernel
 modType = modelType(modelname);
 
 if strcmp(modType,'ode15s')
@@ -84,23 +98,30 @@ if strcmp(modType,'ode15s')
 	else
 		model = @(t,x,p) model(t,x,p);
 	end
-elseif strcmp(modType,'QSSA-m') || strcmp(modType,'QSSA-sbml')
-	
-	modelname = func2str(modelname);
-	if ~exist('model','var')
-		% If model not created, parsing model
-		if strcmp(modelname((end-1):end),'.m')			% check for file extension
-			model = parseModelm(modelname,modelRules,flag);
-		elseif strcmp(modelname((end-3):end),'.xml')   % check for file extension
-			model = parseModelSBML(modelname);
-		elseif exist([modelname '.m'],'file')    % Test if .m file exists
-			model = parseModelm(modelname,modelRules,flag);
-		elseif exist([modelname '.xml'],'file') % Test if .xml file exists
-			model = parseModelSBML(modelname);
+elseif strcmp(modType,'QSSA-m') 
+	for ii = 1:length(modelname)
+		modelname{ii} = func2str(modelname{ii});
+		if exist([modelname{ii}],'file')
+			if strcmp(modelname{ii}(end-1:end),'.m')
+				modelname{ii} = modelname{ii}(1:end-2);
+			end
 		else
 			error('findTC:modelNotFound','Model file not found. Only .xml or .m files accepted')
 		end
 	end
+	model = parseModelm(modelname,modelRules,flag);
+elseif strcmp(modType,'QSSA-sbml')
+	for ii = 1:length(modelname)
+		if exist([modelname{ii}],'file')
+			modelname{ii} = func2str(modelname{ii});
+			if strcmp(modelname{ii}(end-4:end),'.sbml')
+				modelname{ii} = modelname{ii}(1:end-5);
+			end
+		else
+			error('findTC:modelNotFound','Model file not found. Only .xml or .m files accepted')
+		end
+	end
+	model = parseModelSBML(modelname);
 else
 	error('modelObjective:badModelInput','Invalid model passed. Check inputs')
 end
