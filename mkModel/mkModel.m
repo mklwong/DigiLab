@@ -20,9 +20,16 @@ if exist([name '.m'],'file')
 end
 
 curDir = which(mfilename);
-strfind(curDir,'\');
-rmIndx = max(strfind(curDir,'\'));
+
+if ~isempty(strfind(curDir,'\'))
+	rmIndx = max(strfind(curDir,'\'));
+elseif ~isempty(strfind(curDir,'/'))
+	rmIndx = max(strfind(curDir,'/'));
+else
+	error('mkModel: How did I get here? Please contact developer!!!!!')
+end
 curDir(rmIndx+1:end) = [];
+
 if nargin == 2
     curDir = [curDir 'modelTemplate-clean.m'];
 else

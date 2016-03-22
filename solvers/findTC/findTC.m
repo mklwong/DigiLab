@@ -1,6 +1,6 @@
 function [t,Y,YComp,model,status] = findTC(model,tspan,varargin)
 % 
-%   [t,Y] = findTC(model,tspan,...)
+%   [t,Y,YComp,model] = findTC(model,tspan,...)
 %   
 %   Solve for timecourse with:
 %       > model : Function handle of topology file string of .m file. Can
@@ -56,17 +56,22 @@ function [t,Y,YComp,model,status] = findTC(model,tspan,varargin)
 %									doubles).
 %									
 %	Parameter only options
-%       > r     : Ramping in initial conditions only. This produces
-%                 enzymatic complexes implied by the topology and initial
-%                 conditions.
-%       > -r    : No ramping in of initial conditions at all.
+%       > -b    : Basal the system before t = 0.
+%       > -r    : No ramping in of initial conditions at all. NOT
+%                 RECOMMENDED WHEN MODEL HAS ENZYME KINETIC REACTIONS. Use
+%                 only to computationally optimise the simulation process.
 %       
+%	Outputs are:
+%		- t     : Time points
+%		- Y     : Simulated time course with complexes dissociated and removed
+%		- YComp : Simulated time course with complexes undissociated
+%		- model : definition of model as SigMat structure. 
 %
-%   Program automatically extracts the tensors required.
+%   Program can automatically parse the model using parseModel
 %
-%   See also makeTens, dynEqn
+%   See also parseModel, odeQSSA
 %
-%   Martin Wong. University of Sydney. 3/04/2014
+%   Martin Wong. University of Sydney. 22/03/2016
 
 % Determine if ODE model or QSSA model
 modType = modelType(model);

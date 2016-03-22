@@ -1,11 +1,39 @@
 function model = parseModel(modelname,varargin)
 
-% First determine if ODE model or not. Currently done using error checking
-% because not sure how to test if model is linked to a function or a
-% script. The former implies an ode15 file while latter is either an SBML
-% model or matlab QSSA model.
-
-% Options
+%   [model] = parseModel(modelname)
+%   
+%   Parse model into SigMat structure format to be used for simulation and
+%   analysis of the model with:
+%		- modelname as the name of the SigMat model as a text string or
+%		function handle.
+%		- model is the output of the SigMat text format as a structure
+%		format.
+%
+%   The SigMat structure format looks like:
+%	model
+%		- .modSpc   : Information for the species in the system
+%			- .name   : Name of species
+%			- .matVal : matrix value pre-matrix
+%			- .pInd   : parameter index pre-matrix
+%		- .modComp  : Information for compartments in the system
+%			- .name   : Name of compartment
+%			- .matVal : matrix value pre-matrix
+%			- .pInd   : parameter index pre-matrix
+%		- .pFit     : Information for free parameters in the system
+%			- .desc : Name of parameter by row
+%			- .lim  : limit of parameter by index (corresponding to each
+%			          row)
+%			- .npar : number of parameters
+%			- .grp  : Grouping of parameters and the parameter index each
+%			          group is assigned to.
+%		- .param    : Parameter matrices used in simulation. 
+%			- .name   : Name of matrices
+%			- .matVal : matrix value pre-matrix
+%			- .pInd   : parameter index pre-matrix
+%		- .rxnRules : The rule file used to create the model structure
+%
+%   Model will contain a number of structures.
+%
 
 %% Function options
 Names = ['expComp  ';

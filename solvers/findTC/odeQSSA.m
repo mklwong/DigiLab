@@ -47,6 +47,7 @@ for ii = 1:length(varargin)
 				errDir = varargin{ii+1};
 			case lower(deblank(Names(7,:)))   %No basal
 				noBasal = true;
+				detectOpts = true;
 			case []
 				error('Expecting Option String in input');
 			otherwise
