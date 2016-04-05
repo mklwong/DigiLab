@@ -246,12 +246,22 @@ for ii = 1:size(modComp)
 	% Process parameter
     [modComp(ii),pInd,pFit] = testPar(modComp(ii),pFit);
 	
-    if ~isnan(pInd(2))
+	if ~isnan(pInd(2))
         parDesc = [num2str(pInd(2)) ' | Comp : ' modComp(ii).name];
-        pFit.desc{pInd(2)} = parDesc;
-        pFit.lim(pInd(2),:) = Bnd.Comp;
-    end
-    
+		if ~isempty(pFit.desc{pInd(2)})
+			parDesc(1:length(num2str(pInd(2)))) = ' ';
+			oldLength = size(pFit.desc{pInd(2)},2);
+			newLength = length(parDesc);
+			pad(1:max(oldLength,newLength)) = ' ';
+		else
+			newLength = 0;
+			oldLength = 0;
+			pad = ' ';
+		end
+        pFit.desc{pInd(2)} = [pFit.desc{pInd(2)} pad(ones(size(pFit.desc{pInd(2)},1),1),1:(newLength-oldLength));
+			                      parDesc        pad(1:(oldLength-newLength))];
+	end
+	
     modComp(ii).pInd = pInd(2);
 end		
 % Constract modComp
@@ -269,7 +279,18 @@ for ii = 1:size(modSpc)
 	
     if ~isnan(pInd(3))
         parDesc = [num2str(pInd(3)) ' | Conc : ' modSpc(ii).name];
-        pFit.desc{pInd(3)} = parDesc;
+		if ~isempty(pFit.desc{pInd(3)})
+			parDesc(1:length(num2str(pInd(3)))) = ' ';
+			oldLength = size(pFit.desc{pInd(3)},2);
+			newLength = length(parDesc);
+			pad(1:max(oldLength,newLength)) = ' ';
+		else
+			newLength = 0;
+			oldLength = 0;
+			pad = ' ';
+		end
+        pFit.desc{pInd(3)} = [pFit.desc{pInd(3)} pad(ones(size(pFit.desc{pInd(3)},1),1),1:(newLength-oldLength));
+			                      parDesc        pad(1:(oldLength-newLength))];
         pFit.lim(pInd(3),:) = Bnd.Conc;
     end
     

@@ -80,6 +80,7 @@ for ii = 1:length(modelnameCell)
 		if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'modSpc') && isfield(model,'pFit') && isfield(model,'param') && isfield(model,'modComp')
 			%Model structure detected
 			modelname = str2func(model.name);
+			modIsStruct = true;
 		else
 			%Unusual structure
 			error('parseModel:unexpectedModelType','Unexpected model type detected. Only strings, function handles or model structures allow')
@@ -92,7 +93,9 @@ modelname = modelnameCell;
 %% Kernel
 modType = modelType(modelname);
 
-if strcmp(modType,'ode15s')
+if modIsStruct
+	warning('Preparsed model found. Not further parsing is performed. Please insert original .m or .sbml file to reparse.')
+elseif strcmp(modType,'ode15s')
 	if exist('p','var')
 		model = @(t,x) model(t,x,p);
 	else
@@ -112,7 +115,7 @@ elseif strcmp(modType,'QSSA-m')
 	model = parseModelm(modelname,modelRules,flag);
 elseif strcmp(modType,'QSSA-sbml')
 	for ii = 1:length(modelname)
-		if exist([modelname{ii}],'file')
+		if exist([func2str(modelname{ii})],'file')
 			modelname{ii} = func2str(modelname{ii});
 			if strcmp(modelname{ii}(end-4:end),'.sbml')
 				modelname{ii} = modelname{ii}(1:end-5);

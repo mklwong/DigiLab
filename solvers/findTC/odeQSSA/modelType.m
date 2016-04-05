@@ -1,9 +1,9 @@
 function modType = modelType(model)
 modType = [];
 for ii = 1:length(model)
-	if ischar(model(ii))
-		model = str2func(model(ii));
-	elseif isstruct(model(ii))
+	if ischar(model{ii})
+		model{ii} = str2func(model{ii});
+	elseif isstruct(model{ii})
 		modType = 'QSSA-m';
 		continue
 	end
@@ -21,7 +21,9 @@ for ii = 1:length(model)
 	end
 end
 
-if strcmp(msg.identifier,'MATLAB:scriptNotAFunction')
+if ~exist('msg','var')
+	
+elseif strcmp(msg.identifier,'MATLAB:scriptNotAFunction')
 	% A script exists with the name parsed but it is not a function. Likely
 	% to be a QSSA with matlab file
 	if ~strcmp(modType,'QSSA-m') && ~isempty(modType)

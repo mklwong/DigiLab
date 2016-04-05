@@ -74,7 +74,7 @@ function [t,Y,YComp,model,status] = findTC(model,tspan,varargin)
 %   Martin Wong. University of Sydney. 22/03/2016
 
 % Determine if ODE model or QSSA model
-modType = modelType(model);
+modType = modelType({model});
 status = 0;
 if strcmp(modType,'QSSA-m') || strcmp(modType,'QSSA-sbml')
 	[t,Y,YComp,model] = odeQSSA(model,tspan,varargin{:}); 
