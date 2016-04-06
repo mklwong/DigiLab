@@ -66,6 +66,7 @@ else
 	modelnameCell{1} = modelname;
 end
 
+modIsStruct = false;
 % Isolate model name and check that each are not pre-parsed structures
 for ii = 1:length(modelnameCell)
 	modelname = modelnameCell{ii};
