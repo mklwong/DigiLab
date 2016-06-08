@@ -1,5 +1,7 @@
 %% Synthesis
 
+spcMode = 'c';
+
 %% Compartment definition
 %
 % spcComp = {'Compartment name', relative size};

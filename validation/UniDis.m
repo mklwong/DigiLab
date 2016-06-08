@@ -4,6 +4,8 @@
 %
 % spcComp = {'Compartment name', relative size};
 %
+spcMode = 'c';
+
 modComp = {'Cyto', NaN;
            'Cyto2' NaN};
 
@@ -52,5 +54,4 @@ Bnd.r    = [0 1];
 rxn(end+1).desc = 'A -> B';
     rxn(end).sub = 'A';  
     rxn(end).prod= {'B','C'};
-	rxn(end).enz = {'A'};
     rxn(end).k   = NaN; 

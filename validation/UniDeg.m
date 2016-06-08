@@ -4,6 +4,9 @@
 %
 % spcComp = {'Compartment name', relative size};
 %
+
+spcMode = 'a';
+
 modComp = {'Cyto', NaN;
            'Cyto2' NaN};
 

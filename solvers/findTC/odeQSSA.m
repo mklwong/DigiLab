@@ -149,6 +149,10 @@ normInp = @(t) inpFun(t*(tspan(end)-tspan(1))+tspan(1))*(tspan(end)-tspan(1)); %
 % Replace x0 if not passed as an input
 if isempty(x0)
 	x0 = modelOut.modSpc;
+else
+	if length(x0)~=length(modelOut.modSpc)
+		x0(length(modelOut.modSpc)) = 0; %pad out the vector with zeros if necessary
+	end
 end
 
 %ODE Solver options and warning
