@@ -77,7 +77,7 @@ inpFun = @(t)zeros(nx,1);
 %Input values: make all into either function handles or vectors
 % This component looks at the experiment-simulation name pair, then
 % compares the experiment name with the name given in the 
-if iscell(tmpInp) %state name-val pair
+if iscell(tmpInp) % state_name--val pair
 	protList = modelRaw.modSpc.name;
 	inpFunInd = [];
 	inpConstInd = [];

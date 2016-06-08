@@ -95,7 +95,7 @@ modelname = modelnameCell;
 modType = modelType(modelname);
 
 if modIsStruct
-	warning('Preparsed model found. Not further parsing is performed. Please insert original .m or .sbml file to reparse.')
+	warning('parseModel:PreparsedModel','Preparsed model found. Not further parsing is performed. Please insert original .m or .sbml file to reparse.')
 elseif strcmp(modType,'ode15s')
 	if exist('p','var')
 		model = @(t,x) model(t,x,p);

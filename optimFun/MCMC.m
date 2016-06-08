@@ -30,6 +30,9 @@ elseif nargin == 4
 	end
 end
 
+%== Turn off unnecessary warnings ==$
+warning('off','parseModel:PreparsedModel');
+
 %== Integrity Check ==%
 bnd = sort(bnd,2);
 

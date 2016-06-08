@@ -86,6 +86,6 @@ elseif length(vec) == 4
     grp = vec(2);
 else
     %Incorrect number of values passed in parameter
-    error('SIGMAT.testPar:WrongNumVal','Inccorect number of values passed in parameter')
+    error('SIGMAT.testPar:WrongNumVal','Incorrect number of values passed in parameter')
 end
 end

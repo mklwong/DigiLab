@@ -260,6 +260,9 @@ for ii = 1:size(modComp)
 		end
         pFit.desc{pInd(2)} = [pFit.desc{pInd(2)} pad(ones(size(pFit.desc{pInd(2)},1),1),1:(newLength-oldLength));
 			                      parDesc        pad(1:(oldLength-newLength))];
+		if isnan(pFit.lim(pInd(2),1)) %Insert default parameter range if custom value not defined
+			pFit.lim(pInd(2),:) = Bnd.Comp;
+		end
 	end
 	
     modComp(ii).pInd = pInd(2);
@@ -273,6 +276,7 @@ modComp = tmpComp;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Cycle over list of species
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+model.spcMode = spcMode;
 for ii = 1:size(modSpc)
 	% Process parameter
     [modSpc(ii),pInd,pFit] = testPar(modSpc(ii),pFit);
@@ -291,7 +295,9 @@ for ii = 1:size(modSpc)
 		end
         pFit.desc{pInd(3)} = [pFit.desc{pInd(3)} pad(ones(size(pFit.desc{pInd(3)},1),1),1:(newLength-oldLength));
 			                      parDesc        pad(1:(oldLength-newLength))];
-        pFit.lim(pInd(3),:) = Bnd.Conc;
+		if isnan(pFit.lim(pInd(3),1)) %Insert default parameter range if custom value not defined
+			pFit.lim(pInd(3),:) = Bnd.Conc;
+		end
     end
     
     modSpc(ii).pInd = pInd(3);
