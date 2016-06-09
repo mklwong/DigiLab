@@ -21,9 +21,9 @@ rjtRto = sum(acptCnt)/length(acptCnt);
 
 % Adapt step
 %% Normal undirected adaptation
-if rjtRto <= opts.rjtRto  %Success
+if rjtRto <= opts.rjtRto  %Success - reduce step size
     opts.step = max([1e-2+0*opts.step opts.step/1.1],[],2);
-elseif rjtRto > opts.rjtRto % Fail
+elseif rjtRto > opts.rjtRto % Fail - enlarge step
     opts.step = min([opts.maxStep+0*opts.step opts.step*1.1],[],2);
 end
 
