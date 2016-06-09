@@ -30,9 +30,6 @@ elseif nargin == 4
 	end
 end
 
-%== Turn off unnecessary warnings ==$
-warning('off','parseModel:PreparsedModel');
-
 %== Integrity Check ==%
 bnd = sort(bnd,2);
 
@@ -75,9 +72,11 @@ runVar.bnd = bnd;
 %% MCMC Kernel split into multi core parallel and single core mode
 if opts.parMode
 	spmd
+        warningSwitch('off')
 		[ptRaw,logPRaw,status] = MCMCRun(runVar,opts);
 	end
 else
+    warningSwitch('off')
     [ptRaw,logPRaw,status] = MCMCRun(runVar,opts);
 end
 
@@ -558,4 +557,15 @@ ptMidLog = 10.^((log10(bnd(:,2))-log10(bnd(:,1)))/2+log10(bnd(:,1)));
 prop = (rand(size(bnd(:,1)))-0.5);
 pt(~logScale) = ptMidLin(~logScale)+prop(~logScale).*bndRng(~logScale);
 pt( logScale) = ptMidLog(logScale).*(10.^(prop(logScale).*logRng(logScale)));
+end
+
+function warningSwitch(trip)
+
+if strcmpi(trip,'off')
+    %== Turn off unnecessary warnings ==$
+    warning('off','parseModel:PreparsedModel');
+else
+    warning('on','parseModel:PreparsedModel');
+end
+
 end
