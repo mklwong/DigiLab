@@ -77,7 +77,7 @@ opts.passNo    = 500;
 opts.resample  = 50;
 opts.adaptFun  = @adaptStep;
 opts.maxStep   = 1;
-opts.dir       = '';
+opts.dir       = './';
 
 %========================%
 %== Construct new opts ==%
