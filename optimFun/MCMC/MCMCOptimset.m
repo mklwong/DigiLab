@@ -53,6 +53,7 @@ Names = ['PtNo     ' %number of points to store  | defaults at 10,000
 					 %algorithm).                |
 		 'maxStep  ' %Maximum step size          | defaults at 1
 		 'dir      ' %String for output location | defaults at blank
+		 'seed     ' %Initialisation seed        | defaults empty
 		 ];         
      
 %===============================%
@@ -78,6 +79,7 @@ opts.resample  = 50;
 opts.adaptFun  = @adaptStep;
 opts.maxStep   = 1;
 opts.dir       = '.';
+opts.seed      = [];
 
 %========================%
 %== Construct new opts ==%
@@ -122,8 +124,10 @@ for ii = 1:length(varargin)
 				opts.resample = varargin{ii+1};
 			case lower(deblank(Names(15,:)))   %max step
 				opts.maxStep = varargin{ii+1};
-			case lower(deblank(Names(16,:)))   %max step
+			case lower(deblank(Names(16,:)))   %storage directory
 				opts.dir = varargin{ii+1};
+			case lower(deblank(Names(17,:)))   %seed
+				opts.seed = varargin{ii+1};
             otherwise
 				warning('MCMCoptimset:unknowninput',['Input options ' num2str(ii) ' is non-existent. Check spelling.'])
 					

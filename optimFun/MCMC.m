@@ -161,10 +161,16 @@ end
 
 %% Initialisation
 % Reinitialise the random number stream after spmd generated stream (which
-% is always the same. Save the stream for future debugging
+% is always the same. Save the stream for future debugging or used the
+% stream passed in the options.
 mystream = RandStream.create('mrg32k3a','seed',sum(clock*100),'NumStreams',numlab,'StreamIndices',labindx); 
-save([opts.dir '/Seed-Slave ' num2str(labindx)],'runVar','opts','mystream');
-RandStream.setGlobalStream(mystream);
+if isempty(opts.seed)
+	save([opts.dir '/Seed-Slave ' num2str(labindx)],'runVar','opts','mystream');
+else
+	mystream = opts.seed{labindx};
+end
+stream = RandStream.setGlobalStream(mystream);
+reset(stream)
 
 if labindx == 1
     ptNoMax = opts.ptNo;
