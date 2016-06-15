@@ -169,8 +169,10 @@ if isempty(opts.seed)
 else
 	mystream = opts.seed{labindx};
 end
-stream = RandStream.setGlobalStream(mystream);
-reset(stream)
+mystream = RandStream.setGlobalStream(mystream);
+reset(mystream)
+rand(1)
+reset(mystream)
 
 if labindx == 1
     ptNoMax = opts.ptNo;
@@ -207,7 +209,7 @@ status = 1;
 %% Tracking Mode
 if strcmpi(opts.disp,'text')
     outputName = [opts.dir '/Output-Slave ' num2str(labindx) '.txt'];
-    outFileHandle = fopen(outputName,'at');
+    outFileHandle = fopen(outputName,'wt');
 else
     outFileHandle = [];
 end
@@ -233,16 +235,12 @@ while status == 1
             ptTest = opts.prior.pts(newPtInd,:);
 			logPNew  = runVar.obj(ptTest);
 			reTest = false;
-		elseif isfield(opts,'pt0')
-			% If only a single prior point is given, do not jump around the
-			% parameter space by reseeding. Also do not put boundaries on
-			% the fitting.
+		elseif isfield(runVar,'pt0')
+			% If only one seed point given, start there.
 			ptTest = runVar.pt0;
 			logPNew  = runVar.obj(ptTest);
 			opts.resample = Inf;
-			% Remove boundaries of the run, because with only one seed
-			% point, the run is assumed to be exploratory so should be
-			% unbounded.
+			% If no boundary given, then make infinite.
 			if isempty(runVar.bnd)
 				runVar.bnd = ones(varNo,2);
 				runVar.bnd(:,1) = -Inf;
@@ -359,6 +357,8 @@ while status == 1
 		reTest = true;
     end
 	
+    save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat'])
+    
     %% Parallel mode packet send and receive
     if opts.parMode
         if labindx == 1 
@@ -381,7 +381,7 @@ while status == 1
         elseif labindx > 1 && pt_uniQ_n == ptNoMax
             labSend({ptLocal,logPLocal,pt_uniQ_n},1,1);
             logPLocal = nan(size(logPLocal));
-            ptLocal = nan(size(ptLocal));
+            ptLocal = zeros(size(ptLocal));
             pt_n = 0;
 			pt_uniQ_n = 0;
             if ~strcmpi(opts.disp,'off')
