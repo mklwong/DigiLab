@@ -224,7 +224,6 @@ reTest = true;
 %% Start loop
 while status == 1
     %% Debug workspace saving
-    keyboard
     save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat']) %Save entire workspace
     
     %% Print checkpoints
