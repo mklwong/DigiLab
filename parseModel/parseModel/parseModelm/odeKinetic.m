@@ -91,7 +91,6 @@ elseif length(testProd) ~= length(rxn.prod)
 	rxn.prod(end,end) = {'"'};
 	error('odeKinetic:ProductNotInSpeciesList',['Product "' horzcat(rxn.prod{:,:}) ' missing in reaction with description: "' rxn.desc '"'])
 elseif length(testEnz) ~= length(rxn.enz)
-	keyboard
 	rxn.enz(testEnz) = [];
 	rxn.enz(2,:) = {', '};
 	rxn.enz(end,end) = {'"'};
@@ -377,5 +376,4 @@ HillTerm(1:a,1:b) = HillTmp;
 
 % Solve
 varargout{1} = (eye(length(x))+G)\((V*x+(W+HillTerm)*x+model.sigma(t).*model.comp)./model.comp);
-
 end

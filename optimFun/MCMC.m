@@ -164,15 +164,13 @@ end
 % is always the same. Save the stream for future debugging or used the
 % stream passed in the options.
 mystream = RandStream.create('mrg32k3a','seed',sum(clock*100),'NumStreams',numlab,'StreamIndices',labindx); 
+reset(mystream)
 if isempty(opts.seed)
 	save([opts.dir '/Seed-Slave ' num2str(labindx)],'runVar','opts','mystream');
 else
 	mystream = opts.seed{labindx};
 end
-mystream = RandStream.setGlobalStream(mystream);
-reset(mystream)
-rand(1)
-reset(mystream)
+RandStream.setGlobalStream(mystream);
 
 if labindx == 1
     ptNoMax = opts.ptNo;
@@ -225,6 +223,13 @@ reTest = true;
 
 %% Start loop
 while status == 1
+    %% Debug workspace saving
+    keyboard
+    save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat']) %Save entire workspace
+    
+    %% Print checkpoints
+    printCheckpoint('1',outputName,opts.disp);
+    
     %% New active point selection
     if mod(pt_n,opts.resample)==0 || ~isfield(runVar,'pt')
         if ~isempty(opts.prior.pts) && reTest
@@ -267,6 +272,8 @@ while status == 1
 		
     end
 
+    printCheckpoint('2',outputName,opts.disp);
+    
     %% MCMC evolution of active point
     [runVar,opts] = MCMCKernel(runVar,opts);
     acptCnt = [acptCnt(2:end) runVar.ptTest];
@@ -276,6 +283,8 @@ while status == 1
         tNow = clock;
         fprintf_cust(outFileHandle,'Time elapsed - %1.0f | Real time - %2.0f:%2.0f:%2.0f \n\r',floor(toc(t1)/60),tNow(4:6));
     end
+    
+    printCheckpoint('3',outputName,opts.disp);
     
     %% Intermediate plotting of points (full display, only at single core mode)
     if ~opts.parMode && strcmpi(opts.disp,'full')
@@ -341,8 +350,10 @@ while status == 1
  			set(pltHndl3,'XData',[n n(end)+1],'YData',[get(pltHndl3,'YData') sqrt(sum(opts.step.^2))])		
 			drawnow
 		end
-	end
+    end
 	
+    printCheckpoint('4',outputName,opts.disp);
+    
 	%% Point storage
     %Acceptance criteria for storing of active point
     if runVar.logP/opts.T <= -log(opts.Pmin)
@@ -356,41 +367,9 @@ while status == 1
         stallWarn = 0;
 		reTest = true;
     end
-	
-    save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat'])
     
-    %% Parallel mode packet send and receive
-    if opts.parMode
-        if labindx == 1 
-            while labProbe('any',1)
-                dat = labReceive();
-                ptNew    = dat{1};
-                logPNew  = dat{2};
-                slave_pt_uniQ_n = dat{3};
-                pt_uniQ_n = pt_uniQ_n + slave_pt_uniQ_n;
-                pt_n_New = length(logPNew);
-                pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
-                ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
-                logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
-                pt_n = pt_n+pt_n_Get;
-                if ~strcmpi(opts.disp,'off')
-                    tNow = clock;
-                    fprintf_cust(outFileHandle,'Data packet received (pt_n = %d). | (%2.0f:%2.0f:%2.0f) \n\r',slave_pt_uniQ_n,tNow(4:6));
-                end
-            end
-        elseif labindx > 1 && pt_uniQ_n == ptNoMax
-            labSend({ptLocal,logPLocal,pt_uniQ_n},1,1);
-            logPLocal = nan(size(logPLocal));
-            ptLocal = zeros(size(ptLocal));
-            pt_n = 0;
-			pt_uniQ_n = 0;
-            if ~strcmpi(opts.disp,'off')
-                tNow = clock;
-                fprintf_cust(outFileHandle,'Data packet sent.  | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-            end
-        end %when packet full, send
-    end
-
+    printCheckpoint('5',outputName,opts.disp);
+    
     %% Print progress report for running
 
     if pt_uniQ_n >= nprogress*opts.ptNo/opts.dispInt && labindx == 1
@@ -411,6 +390,8 @@ while status == 1
         end
     end
 
+    printCheckpoint('6',outputName,opts.disp);
+    
 	%% Program escape
     % Exit clause for other labs
     if opts.parMode && labindx ~= 1
@@ -421,6 +402,8 @@ while status == 1
         end
     end
 	
+    printCheckpoint('7',outputName,opts.disp);
+    
     %% Stall handling
     if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10)
         stallWarn = stallWarn + 1;
@@ -439,9 +422,78 @@ while status == 1
             status = -1;
         end 
     end
+    
+    printCheckpoint('8',outputName,opts.disp);
+    
+    %% Parallel mode packet send and receive
+    if opts.parMode
+        if labindx == 1 
+            while labProbe('any',1)
+                chkPtFileHndl = fopen([outputName(1:(end-4)) 'checkPoint.txt'],'wt');
+                printCheckpoint('8.1',outputName,opts.disp);
+                fclose(chkPtFileHndl);  
+                [dat,srcIndx] = labReceive();
+                printCheckpoint('8.2',outputName,opts.disp);
+                ptNew    = dat{1};
+                logPNew  = dat{2};
+                slave_pt_uniQ_n = dat{3};
+                pt_uniQ_n = pt_uniQ_n + slave_pt_uniQ_n;
+                pt_n_New = length(logPNew);
+                pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
+                ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
+                logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
+                pt_n = pt_n+pt_n_Get;
+                if ~strcmpi(opts.disp,'off')
+                    tNow = clock;
+                    fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n\r',slave_pt_uniQ_n,srcIndx,tNow(4:6));
+                end
+            end
+        elseif (labindx > 1 && pt_uniQ_n == ptNoMax) && status == 1 %Slave workers send their data to master worker when they reach their quota, but not if kill signal has been sent
+            chkPtFileHndl = fopen([outputName(1:(end-4)) 'checkPoint.txt'],'wt');
+            printCheckpoint('8.1',outputName,opts.disp)
+            fclose(chkPtFileHndl); 
+            labSend({ptLocal,logPLocal,pt_uniQ_n},1,1);
+            printCheckpoint('8.2',outputName,opts.disp)
+            logPLocal = nan(size(logPLocal));
+            ptLocal = zeros(size(ptLocal));
+            pt_n = 0;
+			pt_uniQ_n = 0;
+            if ~strcmpi(opts.disp,'off')
+                tNow = clock;
+                fprintf_cust(outFileHandle,'Data packet sent.  | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
+            end
+        end %when packet full, send
+    end
+    printCheckpoint('9',outputName,opts.disp)
 end
 
 %% Run completion
+printCheckpoint('10',outputName,opts.disp)
+
+% Receive any remaining labSends. Cycle through each 
+if labindx == 1
+    for ii = 2:numlabs
+        if labProbe(ii)
+            dat = labReceive(ii);
+            ptNew    = dat{1};
+            logPNew  = dat{2};
+            slave_pt_uniQ_n = dat{3};
+            pt_uniQ_n = pt_uniQ_n + slave_pt_uniQ_n;
+            pt_n_New = length(logPNew);
+            pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
+            ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
+            logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
+            pt_n = pt_n+pt_n_Get;
+            if ~strcmpi(opts.disp,'off')
+                tNow = clock;
+                fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n\r',slave_pt_uniQ_n,ii,tNow(4:6));
+            end
+        end
+    end
+end
+
+printCheckpoint('11',outputName,opts.disp)
+    
 if opts.parMode
 labBarrier
 end
@@ -575,4 +627,14 @@ else
     warning('on','parseModel:PreparsedModel');
 end
 
+end
+
+function printCheckpoint(num,outputName,disOpts)
+
+if strcmpi(disOpts,'text');
+    chkPtFileHndl = fopen([outputName(1:(end-4)) 'checkPoint.txt'],'wt');
+    fprintf(chkPtFileHndl,'%s',num);
+    fclose(chkPtFileHndl); 
+end
+    
 end

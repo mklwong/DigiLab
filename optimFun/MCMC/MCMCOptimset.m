@@ -46,7 +46,7 @@ Names = ['PtNo     ' %number of points to store  | defaults at 10,000
 		 'ParMode  ' %on or off                  | defaults to off
 		 'PassNo   ' %Number of points stored    | defaults at 500
 		             %before passing.            |
-		 'Resample ' %Number of points stepped   | defaults at 20
+		 'Resample ' %Number of points stepped   | defaults at 50
 		             %before attempting a new    |
 					 %point (new point chosen    |
 					 %subject to metropolis      |
