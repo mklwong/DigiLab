@@ -1,19 +1,17 @@
 function opts = adaptStep(acptCnt,runVar,opts)
 
-if isfield(opts,'step')
-	if isrow(opts.step)
-		opts.step = opts.step';
-	end
-end
-
 % Initial step vector initiation
 if ischar(acptCnt)
 	if strcmpi(acptCnt,'initial')
 		opts.step  = opts.stepi;
-		opts.basis = [1;zeros(runVar.p0-1,1)];
-		opts.basisSkew = 0;
 	end
 	return
+end
+
+if isfield(opts,'step')
+	if isrow(opts.step)
+		opts.step = opts.step';
+	end
 end
 
 % Check step ratio
