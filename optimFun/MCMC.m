@@ -143,7 +143,7 @@ if ~isempty(opts.prior)
 	priorLogP(dupIndx)  = [];
 	priorPts(dupIndx,:) = [];
 	% Turn objective score into PDF and then CDF for prior
-	[priorP,I] = sort(exp(-priorLogP));
+	[priorP,I] = sort(exp(-priorLogP./opts.T));
 	priorPts = priorPts(I,:);
 	priorLogP = priorLogP(I);
 	priorP = cumsum(priorP);
