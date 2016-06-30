@@ -1,28 +1,23 @@
-function opts = adaptStep(acptCnt,runVar,opts)
+function runVar = adaptStep(runVar,opts)
 
 % Initial step vector initiation
-if ischar(acptCnt)
-	if strcmpi(acptCnt,'initial')
-		opts.step  = opts.stepi;
+if ~isfield(runVar,'step')
+	if isrow(opts.stepi)
+		opts.stepi = opts.stepi';
 	end
+	runVar.step  = opts.stepi;
 	return
 end
 
-if isfield(opts,'step')
-	if isrow(opts.step)
-		opts.step = opts.step';
-	end
-end
-
 % Check step ratio
-rjtRto = sum(acptCnt)/length(acptCnt);
+rjtRto = sum(runVar.ptTest)/length(runVar.ptTest);
 
 % Adapt step
 %% Normal undirected adaptation
 if rjtRto <= opts.rjtRto  %Success - reduce step size
-    opts.step = max([1e-2+0*opts.step opts.step/1.1],[],2);
+    runVar.step = max([1e-2*(runVar.step).^0 runVar.step/1.1],[],2);
 elseif rjtRto > opts.rjtRto % Fail - enlarge step
-    opts.step = min([opts.maxStep+0*opts.step opts.step*1.1],[],2);
+    runVar.step = min([opts.maxStep*(runVar.step).^0 runVar.step*1.1],[],2);
 end
 
 %% Test directed adaptation

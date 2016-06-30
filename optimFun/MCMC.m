@@ -25,12 +25,12 @@ bnd = sort(bnd,2); %Make sure boundary is sorted as lower bound in first column 
 
 %== Parameter 2: Initial point ==%
 if ~isempty(pt0)
-	if ~isrow(pt0)
+	if isrow(pt0)
 		pt0 = pt0';
 	end
 	if ~isempty(bnd)
-		if any(pt0<bnd(:,1)' | pt0>bnd(:,2)')
-			find(pt0<bnd(:,1)' | pt0>bnd(:,2)')
+		if any(pt0<bnd(:,1) | pt0>bnd(:,2))
+			find(pt0<bnd(:,1) | pt0>bnd(:,2))
 			error('MCMC:InitialPointOutOfBound','Initial point is outside the required boundary.')
 		end
 	end
@@ -46,7 +46,7 @@ elseif nargin == 4     % When options passed, check that the option class is cor
 end
 
 %% Condensing input parameters for passing into MCMC Kernel
-runVar.pt0 = pt0;
+runVar.pt = pt0;
 runVar.obj = objfun;
 runVar.bnd = bnd;
 
@@ -101,10 +101,12 @@ if opts.parMode
 	spmd
         warningSwitch('off')
 		[ptRaw,logPRaw,ptUniqRaw,status] = MCMCKernel(runVar,opts);
+		warningSwitch('on')
 	end
 else
     warningSwitch('off')
     [ptRaw,logPRaw,ptUniqRaw,status] = MCMCKernel(runVar,opts);
+	warningSwitch('on')
 end
 
 %% Run Completion
@@ -126,6 +128,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function [ptLocal,logPLocal,ptUniqLocal,status] = MCMCKernel(runVar,opts)
+
+%
 % Parallel mode protocols
 % Packet tags are:
 %    1: Sending and receiving points and data
@@ -136,8 +140,15 @@ function [ptLocal,logPLocal,ptUniqLocal,status] = MCMCKernel(runVar,opts)
 %    0: MCMC exited with no errors
 %   -1: MCMC exited as stall time exceeded.
 
-%% Preamble
-% Existence test for parallel computing parameters
+%%
+% ==========================================
+% =================Preamble=================
+% ==========================================
+
+%       -----------------------------
+% ----- Initialise parallel computing ------
+%       -----------------------------
+% Compatibility with versions without parallel computing toolbox
 if ~exist('numlabs','builtin')
     numlab = 1;
     labindx = 1;
@@ -146,7 +157,15 @@ else
     labindx = labindex;
 end
 
-% Intialise random number generator
+% Distinguish between master and slave in terms of total points that need to be saved
+if labindx == 1
+    ptNoMax = opts.ptNo;
+else
+    ptNoMax = opts.passNo;
+end
+ptNoMax = 10*ptNoMax; % store 10x more data points than the maximum in case of duplicates.
+
+% Set up random number stream
 if isempty(opts.seed) % If no random seed given. Generate and save
 	mystream = RandStream.create('mrg32k3a','seed',sum(clock*100),'NumStreams',numlab,'StreamIndices',labindx); % Initialise
 	save([opts.dir '/Seed-Slave ' num2str(labindx)],'runVar','opts','mystream');
@@ -155,125 +174,119 @@ else                  % Else use the existing seed
 end
 RandStream.setGlobalStream(mystream); %set the seed
 
-%% Initialise displays
-if ~strcmpi(opts.disp,'off')
-    if strcmpi(opts.disp,'full') && ~opts.parMode
-        clf
-    end
-	startTime = clock;
-	fprintf('Start time is %2.0f:%2.0f:%2.2f (%2.0f-%2.0f-%4.0f)\n',startTime(4),startTime(5),startTime(6),startTime(3),startTime(2),startTime(1))
-end
-t1 = tic; %t1 is the MCMC begin time (in global terms)
-t2 = tic; %t2 is the time to last completion checkpoint 
-%this is also the counter used for run termination.
+%      ---------------------------
+% ----- Initialise Display Outputs ------
+%      ---------------------------
 
-%% Initialisation
-if labindx == 1
-    ptNoMax = opts.ptNo;
-else
-    ptNoMax = opts.passNo;
-end
+% Start run timers
+t1   = tic;   % t1 is the MCMC begin time (in global terms)
+t2   = tic;   % t2 is the time to last completion checkpoint 
+tNow = clock; % Current time
 
-if ~isfield(opts,'pt0')
-	varNo = size(runVar.bnd,1);
-else
-	varNo = length(runVar.pt0);
-end
-
-% Initialise variables for storing points
-ptLocal = zeros(ptNoMax,varNo);
-ptUniqLocal = zeros(ptNoMax,1);   
-logPLocal   = nan(ptNoMax,1);    
-
-% Initialise counters and markers
-stallWarn   = 0;  %number of stall cycles triggered (program stops when this hits 10)
-pt_n        = 0;
-runVar.logP = Inf;  %Set this to enter point selection and acceptance loop
-pltHndl     = []; % for initialising the program into the first plot of the run
-adaptFun = opts.adaptFun;
-dumVar.p0 = varNo; %Dummy runVar for adaptFun
-dumVar.dp = [];
-opts    = adaptFun('initial',dumVar,opts);
-nprogress = 1; %Blocks of progress passed (each block is printed as a debug message)
-acptCnt = int8(rand(1,20)>opts.rjtRto);
-pt_uniq_n = 0; %Counter for unique points.
-
-% Markov Chain starts below.
-status = 1;
-
-%% Tracking Mode
-if strcmpi(opts.disp,'text')
+% Create output files if necessary
+outputName = [];
+if strcmpi(opts.disp,'debug')
     outputName = [opts.dir '/Output-Slave ' num2str(labindx) '.txt'];
     outFileHandle = fopen(outputName,'wt');
-else
-    outFileHandle = [];
+elseif strcmpi(opts.disp,'text') && labindx == 1
+	outputName = [opts.dir '/Output.txt' ];
+    outFileHandle = fopen(outputName,'wt'); 
+elseif labindx~=1 || strcmpi(opts.disp,'off')
+	outFileHandle = []; %If outhandle is [], does not print
+else 
+    outFileHandle = 1;  %If outhandle is 1, prints to terminal
 end
-tNow = clock;
 fprintf_cust(outFileHandle,'-------------------------------\n\r');
 fprintf_cust(outFileHandle,'--------Run Information--------\n\r');
 fprintf_cust(outFileHandle,'-------------------------------\n\r');
 fprintf_cust(outFileHandle,'T = %1.2f | ',opts.T);
-fprintf_cust(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f \n\r',tNow(4:6));
+fprintf_cust(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f (%2.0f-%2.0f-%4.0f) \n\r',tNow([4:6 3:-1:1]));
 
-[~,logScale]= seedPt(runVar.bnd);
-reTest = true;
+%      -------------------------
+% ----- Initialise Run Variables ------
+%      -------------------------
 
-%% Start loop
+% Choose start point
+if ~isempty(runVar.pt)
+	varNo = length(runVar.pt);
+	opts.resample = Inf; %no resampling when picking one start point
+elseif isfield(runVar,'priorP')
+	varNo = size(opts.prior.pts(1,:),1);
+	rngPt = rand(1);
+	newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
+    runVar.pt    = opts.prior.pts(newPtInd,:);
+	runVar.logP  = runVar.obj(runVar.pt);
+elseif isempty(runVar.bnd)
+	error('mcmc:unboundNoPrior','MCMC cannot be run with no boundary when no prior is given')
+else
+	varNo = size(runVar.bnd,1);
+	runVar.pt   = seedPt(runVar);
+    runVar.logP = runVar.obj(runVar.pt);
+end
+
+% Initialise run functions and parameters
+runVar = opts.adaptFun(runVar,opts);
+runVar.ptTest = mod(1:20,2); % Vector of result of past acceptance tests. As an initial start point, we assume suggests and failures were alternating evenly.
+if isempty(runVar.bnd)
+	runVar.logScale = false(size(runVar.pt));
+else
+	[~,runVar.logScale] = seedPt(runVar);
+end
+
+% Initialise storage variables
+ptLocal = zeros(ptNoMax,varNo);
+ptUniqLocal = zeros(ptNoMax,1);   
+logPLocal   = nan(ptNoMax,1);    
+
+% Initialise run monitors
+stallWarn = 0;   % Number of stall cycles triggered (program stops when this hits 10)
+pltHndl   = [];  % For initialising the program into the first plot of the run
+nprogress = 1;   % Blocks of progress passed (each block is printed as a debug message)
+
+%%
+% ==========================================
+% ============== MCMC Start ================
+% ==========================================
+
+status = 1; % Enter MCMC loop
+runVar.logP = Inf;  %Set this to enter the point selection loop
+
 while status == 1
-    %% Debug workspace saving
-    save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat']) %Save entire workspace
-    
-    %% Print checkpoints
-    printCheckpoint('1',outputName,opts.disp);
-    
+    %Debug workspace saving
+	if strcmpi(opts.disp,'debug')
+		save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat']) %Save entire workspace
+		printCheckpoint('1',outputName,opts.disp);
+	end
     %% New active point selection
-    if mod(pt_n,opts.resample)==0 || ~isfield(runVar,'pt')
-        if ~isempty(opts.prior.pts) && reTest
+    if mod(find(isnan(logPLocal),1,'first'),opts.resample)==0
+        if ~isempty(opts.prior.pts)
 			% Select new point from prior based on goodness of fit of the
 			% prior
             rngPt = rand(1);
 			newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
             ptTest = opts.prior.pts(newPtInd,:);
 			logPNew  = runVar.obj(ptTest);
-			reTest = false;
-		elseif isfield(runVar,'pt0')
-			% If only one seed point given, start there.
-			ptTest = runVar.pt0;
-			logPNew  = runVar.obj(ptTest);
-			opts.resample = Inf;
-			% If no boundary given, then make infinite.
-			if isempty(runVar.bnd)
-				runVar.bnd = ones(varNo,2);
-				runVar.bnd(:,1) = -Inf;
-				runVar.bnd(:,2) = Inf;
-			end
 		else
-			if sum(isinf(-runVar.bnd(:,1)) | isinf(runVar.bnd(:,2)))
-				error('mcmc:unboundNoPrior','Cannot be run with no boundary when no prior is given')
-			end
-            ptTest = seedPt(runVar.bnd);
+            ptTest = seedPt(runVar);
             logPNew  = runVar.obj(ptTest);
-            opts.resample = Inf;
         end % New candidate point
 
         % Metropolis acceptance criteria for new point
-        thres = rand(1);
-		a     = min([1 exp(-(logPNew-runVar.logP)/opts.T)]);
-        if a > thres
-            runVar.pt = ptTest;
-            runVar.logP = logPNew;
-            % Reinitialise MCMC parameters
-            opts.step = ones(size(runVar.bnd(:,1)))*opts.stepi;
-        end
-		
+        thres    = rand(1);
+		testProb = min([1 exp(-(logPNew-runVar.logP)/opts.T)]);
+		if testProb > thres
+			runVar.pt = ptTest;
+			runVar.logP = logPNew;
+			% Reinitialise MCMC parameters
+			opts.step = ones(size(runVar.bnd(:,1)))*opts.stepi;
+		end
     end
-
+	
     printCheckpoint('2',outputName,opts.disp);
     
     %% MCMC evolution of active point
     [runVar,opts] = MCMCEvolve(runVar,opts);
-    acptCnt = [acptCnt(2:end) runVar.ptTest];
-	opts = adaptFun(acptCnt,runVar,opts);
+	runVar = opts.adaptFun(runVar,opts);
 	
     if mod(floor(toc(t1))/60,10) == 0 && strcmpi(opts.disp,'text')
         tNow = clock;
@@ -281,7 +294,7 @@ while status == 1
     end
     
     printCheckpoint('3',outputName,opts.disp);
-    
+
     %% Intermediate plotting of points (full display, only at single core mode)
     if ~opts.parMode && strcmpi(opts.disp,'full')
 		% Test Scale
@@ -354,49 +367,41 @@ while status == 1
     %Acceptance criteria for storing of active point
     if runVar.logP/opts.T <= -log(opts.Pmin)
 		ptUniq = false;
-        if runVar.ptTest
-            pt_uniq_n = pt_uniq_n + 1;
+        if runVar.ptTest(end)
 			ptUniq = true;
-        end
-        pt_n = pt_n + 1;
+		end
+		pt_n = find(isnan(logPLocal),1,'first');
 		ptUniqLocal(pt_n) = ptUniq;
         logPLocal(pt_n)   = runVar.logP;
         ptLocal(pt_n,:)   = runVar.pt;
         t2 = tic;
         stallWarn = 0;
-		reTest = true;
     end
     
     printCheckpoint('5',outputName,opts.disp);
     
-    %% Print progress report for running
-
-    if pt_uniq_n >= nprogress*opts.ptNo/opts.dispInt && labindx == 1
+    % Print progress report for running
+    if sum(ptUniqLocal) >= nprogress*opts.ptNo/opts.dispInt
         nprogress = nprogress + 1;
         tNow = clock;
-        fprintf_cust(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n\r',(pt_uniq_n/ptNoMax*100),toc(t1),tNow(4:6));
+        fprintf(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n\r',(pt_uniq_n/ptNoMax*100),toc(t1),tNow(4:6));
         if pt_uniq_n/ptNoMax >= 1
-            tNow = clock;
-            fprintf_cust(outFileHandle,'Run complete. Quitting. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
+            fprintf(outFileHandle,'Current block complete. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
+			status = 0;
             if opts.parMode
-                labSend(0,2:numlab,2) %Send stop signal
-                if ~strcmpi(opts.disp,'off')
-                    tNow = clock;
-                    fprintf_cust(outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-                end
-            end
-            status = 0;
+                labSend(status,2:numlab,2) %Send stop signal
+                printf(outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
+			end
         end
     end
 
     printCheckpoint('6',outputName,opts.disp);
     
-	%% Program escape
-    % Exit clause for other labs
+	% Program escape for other labs
     if opts.parMode && labindx ~= 1
         if labProbe(1,2)
             tNow = clock;
-            fprintf_cust(outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
+            fprintf(outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
             status = labReceive(1,2);
         end
     end
@@ -409,16 +414,12 @@ while status == 1
         tNow = clock;
         fprintf_cust(outFileHandle,'Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)  | (%2.0f:%2.0f:%2.0f) \n\r',stallWarn,toc(t1),toc(t2),tNow(4:6));
         if toc(t2)>opts.walltime*60
-            tNow = clock;
             fprintf_cust(outFileHandle,'Lab stop triggered due to taking too long... | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
+			status = -1;
             if opts.parMode
-                if strcmpi(opts.disp,'off')
-                    tNow = clock;
-                    fprintf_cust(outFileHandle,'Exit signal sent. Quitting.\n\r | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-                end
-                labSend(-1,2:numlab,2) %Send stop signal
-            end
-            status = -1;
+                labSend(status,2:numlab,2) %Send stop signal
+				fprintf_cust(outFileHandle,'Exit signal sent. Quitting.\n\r | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
+			end
         end 
     end
     
@@ -434,12 +435,12 @@ while status == 1
                 ptNew     = dat{1};
 				logPNew   = dat{2};
 				ptUniqNew = dat{3};
+				pt_n = find(isnan(logPLocal),1,'first');
                 pt_n_New = length(logPNew);
                 pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
                 ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
 				ptUniqLocal((pt_n+1):(pt_n+pt_n_Get)) = ptUniqNew(1:pt_n_Get,:);
                 logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
-                pt_n = pt_n+pt_n_Get;
                 if ~strcmpi(opts.disp,'off')
                     tNow = clock;
                     fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n\r',nansum(ptUniqNew),srcIndx,tNow(4:6));
@@ -452,7 +453,6 @@ while status == 1
 			ptUniqLocal = false(size(logPLocal));
             logPLocal = nan(size(logPLocal));
             ptLocal = zeros(size(ptLocal));
-            pt_n = 0;
             if ~strcmpi(opts.disp,'off')
                 tNow = clock;
                 fprintf_cust(outFileHandle,'Data packet sent.  | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
@@ -473,6 +473,7 @@ if labindx == 1
             ptNew     = dat{1};
             logPNew   = dat{2};
 			ptUniqNew = dat{3};
+			pt_n = find(isnan(logPLocal),1,'first');
             pt_n_New = length(logPNew);
             pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
             ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
@@ -522,115 +523,91 @@ function [runVar,opts] = MCMCEvolve(runVar,opts)
 % MCMCKernel generates and tests the new point point using the hasting
 % ratio for MCMC. Point proposal is conducted
 
-pt0 = runVar.pt;
+% Take out before previous 
+pt0   = runVar.pt;
 logP0 = runVar.logP;
 
 % Generate next point
-[pt1,pdfBias] = opts.propDis(pt0,runVar.bnd,opts);
+[pt1,pdfBias] = opts.propDis(runVar);
 
 %Check point still in boundary
-if sum(pt1 < runVar.bnd(:,1)) || sum(pt1 > runVar.bnd(:,2))
-	error('MCMC:boundaryBreached','The program ran outside the boundary. Likely to be a bug in the proposal distribution')
+if ~isempty(runVar.bnd)
+	if sum(pt1 < runVar.bnd(:,1)) || sum(pt1 > runVar.bnd(:,2))
+		error('MCMC:boundaryBreached','The program ran outside the boundary. Likely to be a bug in the proposal distribution')
+	end
 end
 
-% Try next point
-if ~isrow(pt1)
-	pt1 = pt1';
-end
-if ~isrow(pt0)
-	pt0 = pt0';
-end
-
-logP1 = runVar.obj(pt1);      % Obtain likelihood of proposed step
+% Obtain likelihood of proposed step
+logP1 = runVar.obj(pt1);      
 if isnan(logP1)
 	logP1 = Inf;
 end
 
-% Metropolis Algorithm
-test = min([1 exp((logP0-logP1)/opts.T)/pdfBias]); % Calculate hastings term.
-														  % To make metropolis, set pdfBias
-														  % to one in your proposal
-														  % distribution function.
-
+% Metropolis Algorithm andABC Rejection when less than threshold 
+test = min([1 exp((logP0-logP1)/opts.T)/... % Calculate hastings term to make metropolic, set
+	                    pdfBias]);          % pdfbias to one in your proposal distribution function
 thres = rand(1);   % Randomise threshold
+runVar.ptTest(end+1) = thres < test;
+runVar.ptTest(1) = [];
+% absthres = 1;
+% if logP1 < absthres
+% 	runVar.ptTest = true;
+% end
 
-runVar.ptTest = thres < test;
-
-%ABC Rejection when less than threshold
-
-absthres = 1;
-if logP1 < absthres
-	runVar.ptTest = true;
-end
-
-if runVar.ptTest
+% Replace current point
+if runVar.ptTest(end)
 	runVar.pt = pt1;
 	runVar.logP = logP1;
 else
 	runVar.pt = pt0;
 	runVar.logP = logP0;
 end
-
 runVar.delPt = pt1-pt0;
 
 end
 
-function out = fprintf_cust(h,text,varargin)
-
-if ~exist('numlabs','builtin')
-    labindx = 1;
-else
-    labindx = labindex;
-end
-
-if isempty(h) && labindx == 1
-    fprintf(text,varargin{:})
-    out = [];
-elseif ~isempty(h)
-    out = fprintf(h,text,varargin{:});
-end
-end
-
-function [pt,logScale] = seedPt(bnd)
+function [pt,logScale] = seedPt(runVar)
 
 % Determine whether to use logarithmic scale to sample boundary or to use
 % linear
-bndRng = (bnd(:,2)-bnd(:,1));
+bndRng = (runVar.bnd(:,2)-runVar.bnd(:,1));
 bndRng(isinf(bndRng)) = 1; %Unbounded ones are set to 1
 
 %Determine scale
-logRng = log10(bnd(:,2))-log10(bnd(:,1));
+logRng = log10(runVar.bnd(:,2))-log10(runVar.bnd(:,1));
 %          - magnitude of range > 1
 %          - magnitude of range non-imaginary (i.e. boundary crosses zero)
 %          - magnitude of range not infinity (i.e. one boundary IS zero)
-logScale = (logRng>1&imag(logRng)==0)&(~isinf(logRng));
+logScale = ((logRng>1&imag(logRng)==0)&(~isinf(logRng)));
 
-ptMidLin = ((bnd(:,2)-bnd(:,1))/2+bnd(:,1));
-ptMidLog = 10.^((log10(bnd(:,2))-log10(bnd(:,1)))/2+log10(bnd(:,1)));
+ptMidLin = ((runVar.bnd(:,2)-runVar.bnd(:,1))/2+runVar.bnd(:,1));
+ptMidLog = 10.^((log10(runVar.bnd(:,2))-log10(runVar.bnd(:,1)))/2+log10(runVar.bnd(:,1)));
 %%
 % Generate random variable. Undirected
-prop = (rand(size(bnd(:,1)))-0.5);
-pt(~logScale) = ptMidLin(~logScale)+prop(~logScale).*bndRng(~logScale);
-pt( logScale) = ptMidLog(logScale).*(10.^(prop(logScale).*logRng(logScale)));
+prop = (rand(size(runVar.bnd(:,1)))-0.5);
+pt(~logScale,1) = ptMidLin(~logScale)+prop(~logScale).*bndRng(~logScale);
+pt( logScale,1) = ptMidLog(logScale).*(10.^(prop(logScale).*logRng(logScale)));
 end
 
 function warningSwitch(trip)
 
-if strcmpi(trip,'off')
-    %== Turn off unnecessary warnings ==$
-    warning('off','parseModel:PreparsedModel');
-else
-    warning('on','parseModel:PreparsedModel');
-end
+% Place list of warnings to switch below
+warning(trip,'parseModel:PreparsedModel');
 
 end
 
 function printCheckpoint(num,outputName,disOpts)
 
-if strcmpi(disOpts,'text');
+if strcmpi(disOpts,'debug')
     chkPtFileHndl = fopen([outputName(1:(end-4)) 'checkPoint.txt'],'wt');
     fprintf(chkPtFileHndl,'%s',num);
     fclose(chkPtFileHndl); 
 end
     
+end
+
+function out = fprintf_cust(outFileHandle,text,varargin)
+	if ~isempty(outFileHandle)
+		out = fprintf(outFileHandle,text,varargin{:});
+	end
 end

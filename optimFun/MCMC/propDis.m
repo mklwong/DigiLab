@@ -1,41 +1,33 @@
-function [pt1,pdfBias] = propDis(pt0,bnd,opts)
+function [pt1,pdfBias] = propDis(runVar)
 
 % pdfBias is q(x,y)/q(y,x)
 
-% Make p a column
-if isrow(pt0)
-	pt0 = pt0';
-end
-
-if isrow(opts.step)
-	opts.step = opts.step';
-end
-
 %initialise stuff
-pt1 = 0*pt0;
+pt1 = 0*runVar.pt;
 
-reRoll = true(size(pt0));
+reRoll = true(size(runVar.pt));
 n = 6; %scaling factor to turn range of randn to the width of the boundary.
 
-% Determine whether to use logarithmic scale to sample boundary or to use
-% linear
-bndRng = (bnd(:,2)-bnd(:,1));
-bndRng(isinf(bndRng)) = 1; %Unbounded ones are set to 1
-
-%Determine scale
-logTest = log(bnd(:,2))-log(bnd(:,1));
-%          - magnitude of range > 1
-%          - magnitude of range non-imaginary (i.e. boundary crosses zero)
-%          - magnitude of range not infinity (i.e. one boundary IS zero)
-logScale = (logTest>1&imag(logTest)==0)&(~isinf(logTest));
+if ~isempty(runVar.bnd)
+	% Determine whether to use logarithmic scale to sample boundary or to use
+	% linear
+	bndRng = (runVar.bnd(:,2)-runVar.bnd(:,1));
+	bndRng(isinf(bndRng)) = 1; %Unbounded ones are set to 1
+else
+	bndRng = ones(size(pt1));
+end
 
 %%
 % Generate random variable. Undirected
-while sum(reRoll)
-	prop = randn(size(pt0))/n.*opts.step.*bndRng;
-	pt1(reRoll&~logScale) = pt0(reRoll&~logScale)+prop(reRoll&~logScale);
-	pt1(reRoll&logScale) = pt0(reRoll&logScale).*exp(prop(reRoll&logScale));
-	reRoll = pt1<bnd(:,1)|pt1>bnd(:,2);
+while any(reRoll)
+	prop = randn(size(runVar.pt))/n.*runVar.step.*bndRng;
+	pt1(reRoll&~runVar.logScale) = runVar.pt(reRoll&~runVar.logScale)+prop(reRoll&~runVar.logScale);
+	pt1(reRoll&runVar.logScale) = runVar.pt(reRoll&runVar.logScale).*exp(prop(reRoll&runVar.logScale));
+	if ~isempty(runVar.bnd)
+		reRoll = pt1<runVar.bnd(:,1)|pt1>runVar.bnd(:,2);
+	else
+		reRoll = false(size(pt1));
+	end
 end
 
 % Generate random variable. Directed
@@ -59,14 +51,14 @@ end
 % This is for the hastings ratio
 
 %Create mixed log and lin scale points
-pt0_M = pt0;
-pt0_M(logScale) = log(pt0(logScale));
+pt0_M = runVar.pt;
+pt0_M(runVar.logScale) = log(runVar.pt(runVar.logScale));
 pt1_M = pt1;
-pt1_M(logScale) = log(pt1(logScale));
-bnd_M = bnd;
-bnd_M(logScale,:) = log(bnd(logScale,:));
+pt1_M(runVar.logScale) = log(pt1(runVar.logScale));
+bnd_M = runVar.bnd;
+bnd_M(runVar.logScale,:) = log(runVar.bnd(runVar.logScale,:));
 
-pdfBias = biasCalc(pt0_M,pt1_M,bnd_M,n,opts.step);
+pdfBias = biasCalc(pt0_M,pt1_M,bnd_M,n,runVar.step);
 
 end
 
