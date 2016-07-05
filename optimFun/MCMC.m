@@ -163,7 +163,6 @@ if labindx == 1
 else
     ptNoMax = opts.passNo;
 end
-ptNoMax = 10*ptNoMax; % store 10x more data points than the maximum in case of duplicates.
 
 % Set up random number stream
 if isempty(opts.seed) % If no random seed given. Generate and save
@@ -196,11 +195,11 @@ elseif labindx~=1 || strcmpi(opts.disp,'off')
 else 
     outFileHandle = 1;  %If outhandle is 1, prints to terminal
 end
-fprintf_cust(outFileHandle,'-------------------------------\n\r');
-fprintf_cust(outFileHandle,'--------Run Information--------\n\r');
-fprintf_cust(outFileHandle,'-------------------------------\n\r');
+fprintf_cust(outFileHandle,'-------------------------------\n');
+fprintf_cust(outFileHandle,'--------Run Information--------\n');
+fprintf_cust(outFileHandle,'-------------------------------\n');
 fprintf_cust(outFileHandle,'T = %1.2f | ',opts.T);
-fprintf_cust(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f (%2.0f-%2.0f-%4.0f) \n\r',tNow([4:6 3:-1:1]));
+fprintf_cust(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f (%2.0f-%2.0f-%4.0f) \n',tNow([4:6 3:-1:1]));
 
 %      -------------------------
 % ----- Initialise Run Variables ------
@@ -233,240 +232,243 @@ else
 	[~,runVar.logScale] = seedPt(runVar);
 end
 
-% Initialise storage variables
-ptLocal = zeros(ptNoMax,varNo);
-ptUniqLocal = zeros(ptNoMax,1);   
-logPLocal   = nan(ptNoMax,1);    
+% Initialise storage variables (store 10 times more than necessary in case
+% of duplicates)
+ptLocal = zeros(ptNoMax*10,varNo);
+ptUniqLocal = zeros(ptNoMax*10,1);   
+logPLocal   = nan(ptNoMax*10,1);    
 
 % Initialise run monitors
 stallWarn = 0;   % Number of stall cycles triggered (program stops when this hits 10)
 pltHndl   = [];  % For initialising the program into the first plot of the run
 nprogress = 1;   % Blocks of progress passed (each block is printed as a debug message)
 
-%%
+
 % ==========================================
 % ============== MCMC Start ================
 % ==========================================
 
 status = 1; % Enter MCMC loop
 runVar.logP = Inf;  %Set this to enter the point selection loop
-
+%%
 while status == 1
-    %Debug workspace saving
-	if strcmpi(opts.disp,'debug')
-		save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat']) %Save entire workspace
-		printCheckpoint('1',outputName,opts.disp);
-	end
-    %% New active point selection
-    if mod(find(isnan(logPLocal),1,'first'),opts.resample)==0
-        if ~isempty(opts.prior.pts)
-			% Select new point from prior based on goodness of fit of the
-			% prior
-            rngPt = rand(1);
-			newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
-            ptTest = opts.prior.pts(newPtInd,:);
-			logPNew  = runVar.obj(ptTest);
-		else
-            ptTest = seedPt(runVar);
-            logPNew  = runVar.obj(ptTest);
-        end % New candidate point
-
-        % Metropolis acceptance criteria for new point
-        thres    = rand(1);
-		testProb = min([1 exp(-(logPNew-runVar.logP)/opts.T)]);
-		if testProb > thres
-			runVar.pt = ptTest;
-			runVar.logP = logPNew;
-			% Reinitialise MCMC parameters
-			opts.step = ones(size(runVar.bnd(:,1)))*opts.stepi;
-		end
-    end
 	
-    printCheckpoint('2',outputName,opts.disp);
-    
-    %% MCMC evolution of active point
-    [runVar,opts] = MCMCEvolve(runVar,opts);
-	runVar = opts.adaptFun(runVar,opts);
-	
-    if mod(floor(toc(t1))/60,10) == 0 && strcmpi(opts.disp,'text')
-        tNow = clock;
-        fprintf_cust(outFileHandle,'Time elapsed - %1.0f | Real time - %2.0f:%2.0f:%2.0f \n\r',floor(toc(t1)/60),tNow(4:6));
-    end
-    
-    printCheckpoint('3',outputName,opts.disp);
-
-    %% Intermediate plotting of points (full display, only at single core mode)
-    if ~opts.parMode && strcmpi(opts.disp,'full')
-		% Test Scale
-		if ~logScale(1)
-			fordDirX = runVar.pt(1)+opts.basis(1)*opts.step(1);
-			RevDirX = runVar.pt(1)-opts.basis(1)*opts.step(1);
-		else
-			fordDirX = runVar.pt(1)*opts.basis(1)*opts.step(1);
-			RevDirX = runVar.pt(1)/(opts.basis(1)*opts.step(1));
-		end
-		
-		if ~logScale(2)
-			fordDirY = runVar.pt(2)+opts.basis(2)*opts.step(2);
-			RevDirY = runVar.pt(2)-opts.basis(2)*opts.step(2);
-		else
-			fordDirY = runVar.pt(2)*opts.basis(2)*opts.step(2);
-			RevDirY = runVar.pt(2)/(opts.basis(2)*opts.step(2));
-		end
-		
-        if isempty(pltHndl)
-            subplot(2,2,[1 3])
-			
-
-			% Draw the boundaries
-			curBasis = [opts.basis null(opts.basis')];%%%
-			if isfield(opts,'pt0')
-				pltHndl = plot(runVar.pt(1),runVar.pt(2),'x',...
-				runVar.pt(1),runVar.pt(2),'o',...
-				[fordDirX RevDirX],[fordDirY RevDirY]);%%%
-			else
-				pltHndl = plot(runVar.pt(1),runVar.pt(2),'x',...
-				runVar.pt(1),runVar.pt(2),'o',...
-				[runVar.pt(1) runVar.pt(1)+opts.basis(1)*opts.step(1)],[runVar.pt(2) runVar.pt(2)+opts.basis(2)*opts.step(1)],...%%%%
-				[runVar.bnd(1,1) runVar.bnd(1,2)],[runVar.bnd(2,1) runVar.bnd(2,1)],...
-				[runVar.bnd(1,2) runVar.bnd(1,2)],[runVar.bnd(2,1) runVar.bnd(2,2)],...
-				[runVar.bnd(1,2) runVar.bnd(1,1)],[runVar.bnd(2,2) runVar.bnd(2,2)],...
-				[runVar.bnd(1,1) runVar.bnd(1,1)],[runVar.bnd(2,2) runVar.bnd(2,1)]);
-			end
-			if logScale(1)
-				set(gca,'XScale','log')
-			end
-			if logScale(2)
-				set(gca,'YScale','log')
-			end
-			% Other diagnostic plots
-            subplot(2,2,2)
-            pltHndl2 = semilogy(1,runVar.logP/opts.T,[0 1],-log10([opts.Pmin opts.Pmin]),':');
- 			subplot(2,2,4)
-			pltHndl3 = plot(1,sqrt(sum(opts.step.^2)));
-        else
-			subplot(2,2,[1 3])
-			xlabel('Param 1')
-			ylabel('Param 2')
-			title(['Pts saved = ' num2str(pt_uniq_n,'%d')])
-            set(pltHndl(1),'XData',[get(pltHndl(1),'XData') runVar.pt(1)],'YData',[get(pltHndl(1),'YData') runVar.pt(2)])
-            n   = get(pltHndl3(1),'XData');
-            set(pltHndl(2),'XData',runVar.pt(1),'YData',runVar.pt(2))
-			curBasis = [opts.basis null(opts.basis')];
-			set(pltHndl(3),'XData',[fordDirX RevDirX],'YData',[fordDirY RevDirY])
-			set(pltHndl2(1),'XData',[n n(end)+1],'YData',[get(pltHndl2(1),'YData') runVar.logP/opts.T])
-			set(pltHndl2(2),'XData',[0 n(end)+1])
- 			set(pltHndl3,'XData',[n n(end)+1],'YData',[get(pltHndl3,'YData') sqrt(sum(opts.step.^2))])		
-			drawnow
-		end
-    end
-	
-    printCheckpoint('4',outputName,opts.disp);
-    
-	%% Point storage
-    %Acceptance criteria for storing of active point
-    if runVar.logP/opts.T <= -log(opts.Pmin)
-		ptUniq = false;
-        if runVar.ptTest(end)
-			ptUniq = true;
-		end
-		pt_n = find(isnan(logPLocal),1,'first');
-		ptUniqLocal(pt_n) = ptUniq;
-        logPLocal(pt_n)   = runVar.logP;
-        ptLocal(pt_n,:)   = runVar.pt;
-        t2 = tic;
-        stallWarn = 0;
-    end
-    
-    printCheckpoint('5',outputName,opts.disp);
-    
-    % Print progress report for running
-    if sum(ptUniqLocal) >= nprogress*opts.ptNo/opts.dispInt
-        nprogress = nprogress + 1;
-        tNow = clock;
-        fprintf(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n\r',(pt_uniq_n/ptNoMax*100),toc(t1),tNow(4:6));
-        if pt_uniq_n/ptNoMax >= 1
-            fprintf(outFileHandle,'Current block complete. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-			status = 0;
-            if opts.parMode
-                labSend(status,2:numlab,2) %Send stop signal
-                printf(outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-			end
-        end
-    end
-
-    printCheckpoint('6',outputName,opts.disp);
-    
-	% Program escape for other labs
-    if opts.parMode && labindx ~= 1
-        if labProbe(1,2)
-            tNow = clock;
-            fprintf(outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-            status = labReceive(1,2);
-        end
-    end
-	
-    printCheckpoint('7',outputName,opts.disp);
-    
-    %% Stall handling
-    if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10)
-        stallWarn = stallWarn + 1;
-        tNow = clock;
-        fprintf_cust(outFileHandle,'Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)  | (%2.0f:%2.0f:%2.0f) \n\r',stallWarn,toc(t1),toc(t2),tNow(4:6));
-        if toc(t2)>opts.walltime*60
-            fprintf_cust(outFileHandle,'Lab stop triggered due to taking too long... | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-			status = -1;
-            if opts.parMode
-                labSend(status,2:numlab,2) %Send stop signal
-				fprintf_cust(outFileHandle,'Exit signal sent. Quitting.\n\r | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-			end
-        end 
-    end
-    
-    printCheckpoint('8',outputName,opts.disp);
-    
-    %% Parallel mode packet send and receive
-    if opts.parMode
-        if labindx == 1 
-            while labProbe('any',1)
-                printCheckpoint('8.1',outputName,opts.disp);
-                [dat,srcIndx] = labReceive();
-                printCheckpoint('8.2',outputName,opts.disp);
-                ptNew     = dat{1};
-				logPNew   = dat{2};
-				ptUniqNew = dat{3};
-				pt_n = find(isnan(logPLocal),1,'first');
-                pt_n_New = length(logPNew);
-                pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
-                ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
-				ptUniqLocal((pt_n+1):(pt_n+pt_n_Get)) = ptUniqNew(1:pt_n_Get,:);
-                logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
-                if ~strcmpi(opts.disp,'off')
-                    tNow = clock;
-                    fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n\r',nansum(ptUniqNew),srcIndx,tNow(4:6));
-                end
-            end
-        elseif (labindx > 1 && nansum(ptUniqLocal) == ptNoMax) && status == 1 %Slave workers send their data to master worker when they reach their quota, but not if kill signal has been sent
-            printCheckpoint('8.1',outputName,opts.disp)
-            labSend({ptLocal,logPLocal,ptUniqLocal},1,1);
-            printCheckpoint('8.2',outputName,opts.disp)
-			ptUniqLocal = false(size(logPLocal));
-            logPLocal = nan(size(logPLocal));
-            ptLocal = zeros(size(ptLocal));
-            if ~strcmpi(opts.disp,'off')
-                tNow = clock;
-                fprintf_cust(outFileHandle,'Data packet sent.  | (%2.0f:%2.0f:%2.0f) \n\r',tNow(4:6));
-            end
-        end %when packet full, send
-    end
-    printCheckpoint('9',outputName,opts.disp)
+%Debug workspace saving
+if strcmpi(opts.disp,'debug')
+	save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat']) %Save entire workspace
 end
+printCheckpoint('1',outputName,opts.disp);	
 
+%      --------------------
+% ----- Find new seed point ------
+%      --------------------
+if mod(find(isnan(logPLocal),1,'first'),opts.resample)==0
+	if ~isempty(opts.prior.pts)
+		% Select new point from prior based on goodness of fit of the
+		% prior
+		rngPt = rand(1);
+		newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
+		ptTest = opts.prior.pts(newPtInd,:);
+		logPNew  = runVar.obj(ptTest);
+	else
+		ptTest = seedPt(runVar);
+		logPNew  = runVar.obj(ptTest);
+	end % New candidate point
+
+	% Metropolis acceptance criteria for new point
+	thres    = rand(1);
+	testProb = min([1 exp(-(logPNew-runVar.logP)/opts.T)]);
+	if testProb > thres
+		runVar.pt = ptTest;
+		runVar.logP = logPNew;
+		% Reinitialise MCMC parameters
+		opts.step = ones(size(runVar.bnd(:,1)))*opts.stepi;
+	end
+end
+printCheckpoint('2',outputName,opts.disp);
+   
+%      --------------------
+% ----- Evolve Active Point ------
+%      --------------------
+[runVar,opts] = MCMCEvolve(runVar,opts);
+runVar = opts.adaptFun(runVar,opts);
+
+if mod(floor(toc(t1))/60,10) == 0 && strcmpi(opts.disp,'text')
+	tNow = clock;
+	fprintf_cust(outFileHandle,'Time elapsed - %1.0f | Real time - %2.0f:%2.0f:%2.0f \n',floor(toc(t1)/60),tNow(4:6));
+end
+printCheckpoint('3',outputName,opts.disp);
+
+%      ----------------------------
+% ----- Plot Distribution of Points ------
+%      ----------------------------
+if ~opts.parMode && strcmpi(opts.disp,'full')
+	% Test Scale
+	if ~logScale(1)
+		fordDirX = runVar.pt(1)+opts.basis(1)*opts.step(1);
+		RevDirX = runVar.pt(1)-opts.basis(1)*opts.step(1);
+	else
+		fordDirX = runVar.pt(1)*opts.basis(1)*opts.step(1);
+		RevDirX = runVar.pt(1)/(opts.basis(1)*opts.step(1));
+	end
+
+	if ~logScale(2)
+		fordDirY = runVar.pt(2)+opts.basis(2)*opts.step(2);
+		RevDirY = runVar.pt(2)-opts.basis(2)*opts.step(2);
+	else
+		fordDirY = runVar.pt(2)*opts.basis(2)*opts.step(2);
+		RevDirY = runVar.pt(2)/(opts.basis(2)*opts.step(2));
+	end
+
+	if isempty(pltHndl)
+		subplot(2,2,[1 3])
+
+
+		% Draw the boundaries
+		curBasis = [opts.basis null(opts.basis')];%%%
+		if isfield(opts,'pt0')
+			pltHndl = plot(runVar.pt(1),runVar.pt(2),'x',...
+			runVar.pt(1),runVar.pt(2),'o',...
+			[fordDirX RevDirX],[fordDirY RevDirY]);%%%
+		else
+			pltHndl = plot(runVar.pt(1),runVar.pt(2),'x',...
+			runVar.pt(1),runVar.pt(2),'o',...
+			[runVar.pt(1) runVar.pt(1)+opts.basis(1)*opts.step(1)],[runVar.pt(2) runVar.pt(2)+opts.basis(2)*opts.step(1)],...%%%%
+			[runVar.bnd(1,1) runVar.bnd(1,2)],[runVar.bnd(2,1) runVar.bnd(2,1)],...
+			[runVar.bnd(1,2) runVar.bnd(1,2)],[runVar.bnd(2,1) runVar.bnd(2,2)],...
+			[runVar.bnd(1,2) runVar.bnd(1,1)],[runVar.bnd(2,2) runVar.bnd(2,2)],...
+			[runVar.bnd(1,1) runVar.bnd(1,1)],[runVar.bnd(2,2) runVar.bnd(2,1)]);
+		end
+		if logScale(1)
+			set(gca,'XScale','log')
+		end
+		if logScale(2)
+			set(gca,'YScale','log')
+		end
+		% Other diagnostic plots
+		subplot(2,2,2)
+		pltHndl2 = semilogy(1,runVar.logP/opts.T,[0 1],-log10([opts.Pmin opts.Pmin]),':');
+		subplot(2,2,4)
+		pltHndl3 = plot(1,sqrt(sum(opts.step.^2)));
+	else
+		subplot(2,2,[1 3])
+		xlabel('Param 1')
+		ylabel('Param 2')
+		title(['Pts saved = ' num2str(sum(ptUniqLocal),'%d')])
+		set(pltHndl(1),'XData',[get(pltHndl(1),'XData') runVar.pt(1)],'YData',[get(pltHndl(1),'YData') runVar.pt(2)])
+		n   = get(pltHndl3(1),'XData');
+		set(pltHndl(2),'XData',runVar.pt(1),'YData',runVar.pt(2))
+		curBasis = [opts.basis null(opts.basis')];
+		set(pltHndl(3),'XData',[fordDirX RevDirX],'YData',[fordDirY RevDirY])
+		set(pltHndl2(1),'XData',[n n(end)+1],'YData',[get(pltHndl2(1),'YData') runVar.logP/opts.T])
+		set(pltHndl2(2),'XData',[0 n(end)+1])
+		set(pltHndl3,'XData',[n n(end)+1],'YData',[get(pltHndl3,'YData') sqrt(sum(opts.step.^2))])		
+		drawnow
+	end
+end
+printCheckpoint('4',outputName,opts.disp);
+
+%       ---------------------
+% ----- Store point in worker ------
+%       ----------------------
+if runVar.logP/opts.T <= -log(opts.Pmin)
+	ptUniq = false;
+	if runVar.ptTest(end)
+		ptUniq = true;
+	end
+	pt_n = find(isnan(logPLocal),1,'first');
+	ptUniqLocal(pt_n) = ptUniq;
+	logPLocal(pt_n)   = runVar.logP;
+	ptLocal(pt_n,:)   = runVar.pt;
+	t2 = tic;
+	stallWarn = 0;
+end
+printCheckpoint('5',outputName,opts.disp);
+    
+%       -----------------------------
+% ----- Primary worker progress check ------
+%       -----------------------------
+if sum(ptUniqLocal) >= nprogress*opts.ptNo/opts.dispInt
+	nprogress = nprogress + 1;
+	tNow = clock;
+	fprintf(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n',(sum(ptUniqLocal)/ptNoMax*100),toc(t1),tNow(4:6));
+	if sum(ptUniqLocal)/ptNoMax >= 1
+		fprintf(outFileHandle,'Current block complete. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		status = 0;
+		if opts.parMode
+			labSend(status,2:numlab,2) %Send stop signal
+			printf(outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		end
+	end
+end
+printCheckpoint('6',outputName,opts.disp);
+
+%       ------------------------------
+% ----- Stall check (lack of progress) ------
+%       ------------------------------
+if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10)
+	stallWarn = stallWarn + 1;
+	tNow = clock;
+	fprintf_cust(outFileHandle,'Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)  | (%2.0f:%2.0f:%2.0f) \n',stallWarn,toc(t1),toc(t2),tNow(4:6));
+	if toc(t2)>opts.walltime*60
+		fprintf_cust(outFileHandle,'Lab stop triggered due to taking too long... | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		status = -1;
+		if opts.parMode
+			labSend(status,2:numlab,2) %Send stop signal
+			fprintf_cust(outFileHandle,'Exit signal sent. Quitting.\n | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		end
+	end 
+end
+printCheckpoint('7',outputName,opts.disp);
+
+%       ----------------------------------
+% ----- Secondary worker exit signal check ------
+%       ----------------------------------
+if opts.parMode && labindx ~= 1
+	if labProbe(1,2)
+		tNow = clock;
+		fprintf(outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		status = labReceive(1,2);
+	end
+end
+printCheckpoint('8',outputName,opts.disp);
+
+%       -----------------------------------------------
+% ----- Send data from secondary work to primary worker ------
+%       -----------------------------------------------
+if labindx == 1 && opts.parMode
+	while labProbe('any',1)
+		[dat,srcIndx] = labReceive();
+		ptNew     = dat{1};
+		logPNew   = dat{2};
+		ptUniqNew = dat{3};
+		pt_n = find(isnan(logPLocal),1,'first');
+		pt_n_New = length(logPNew);
+		pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
+		ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
+		ptUniqLocal((pt_n+1):(pt_n+pt_n_Get)) = ptUniqNew(1:pt_n_Get,:);
+		logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
+		tNow = clock;
+		fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
+	end
+elseif (labindx > 1 && nansum(ptUniqLocal) == ptNoMax) && status == 1
+	labSend({ptLocal,logPLocal,ptUniqLocal},1,1);
+	ptUniqLocal = false(size(logPLocal));
+	logPLocal = nan(size(logPLocal));
+	ptLocal = zeros(size(ptLocal));
+	tNow = clock;
+	fprintf_cust(outFileHandle,'Data packet sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+end
+printCheckpoint('9',outputName,opts.disp)
+
+end
 %% Run completion
 printCheckpoint('10',outputName,opts.disp)
 
-% Receive any remaining labSends. Cycle through each 
-if labindx == 1
+%       -----------------------------------------------------
+% ----- Cycle through each secondary worker and look for data ------
+%       -----------------------------------------------------
+if labindx == 1 && opts.parMode
     for ii = 2:numlabs
         if labProbe(ii)
             [dat,srcIndx] = labReceive(ii);
@@ -479,10 +481,9 @@ if labindx == 1
             ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
 			ptUniqLocal((pt_n+1):(pt_n+pt_n_Get)) = ptUniqNew(1:pt_n_Get,:);
             logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
-            pt_n = pt_n+pt_n_Get;
             if ~strcmpi(opts.disp,'off')
                 tNow = clock;
-                fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n\r',nansum(ptUniqNew),srcIndx,ii,tNow(4:6));
+                fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,ii,tNow(4:6));
             end
         end
     end
@@ -494,15 +495,11 @@ if opts.parMode
 	labBarrier
 end
 
-fprintf_cust(outFileHandle,'-------------------------------\n\r');
-fprintf_cust(outFileHandle,'-------------Run Ended---------\n\r');
-fprintf_cust(outFileHandle,'-------------------------------\n\r\n\r\n\r');
+fprintf_cust(outFileHandle,'--------------------------------\n');
+fprintf_cust(outFileHandle,'------------Run Ended-----------\n');
+fprintf_cust(outFileHandle,'--------------------------------\n\n\n');
 
-if labindx == 1
-    fprintf_cust(outFileHandle,'Done!\n')
-end
-
-if strcmpi(opts.disp,'text')
+if ~isempty(outFileHandle) && outFileHandle~=1
     fclose(outFileHandle);
 end
 
@@ -566,6 +563,9 @@ runVar.delPt = pt1-pt0;
 
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 function [pt,logScale] = seedPt(runVar)
 
 % Determine whether to use logarithmic scale to sample boundary or to use
@@ -582,12 +582,15 @@ logScale = ((logRng>1&imag(logRng)==0)&(~isinf(logRng)));
 
 ptMidLin = ((runVar.bnd(:,2)-runVar.bnd(:,1))/2+runVar.bnd(:,1));
 ptMidLog = 10.^((log10(runVar.bnd(:,2))-log10(runVar.bnd(:,1)))/2+log10(runVar.bnd(:,1)));
-%%
+
 % Generate random variable. Undirected
 prop = (rand(size(runVar.bnd(:,1)))-0.5);
 pt(~logScale,1) = ptMidLin(~logScale)+prop(~logScale).*bndRng(~logScale);
 pt( logScale,1) = ptMidLog(logScale).*(10.^(prop(logScale).*logRng(logScale)));
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function warningSwitch(trip)
 
@@ -596,15 +599,21 @@ warning(trip,'parseModel:PreparsedModel');
 
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 function printCheckpoint(num,outputName,disOpts)
 
-if strcmpi(disOpts,'debug')
+if strcmpi(disOpts,'debug') && ~isempty(outputName)
     chkPtFileHndl = fopen([outputName(1:(end-4)) 'checkPoint.txt'],'wt');
     fprintf(chkPtFileHndl,'%s',num);
     fclose(chkPtFileHndl); 
 end
     
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function out = fprintf_cust(outFileHandle,text,varargin)
 	if ~isempty(outFileHandle)
