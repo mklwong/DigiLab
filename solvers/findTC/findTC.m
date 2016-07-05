@@ -162,7 +162,7 @@ end
 warnstate('error')
 
 doInteg = true;
-norm_tspan = [0 1];
+norm_tspan = [0 5];
 %% Solving
 % Ramping
 if ~noRamp
@@ -179,7 +179,7 @@ if ~noRamp
 	try
 		[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
 	catch errMsg
-		t = [0 1];
+		t = [0 norm_tspan(2)];
 		if errDir 
 			storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
 		else
@@ -210,7 +210,7 @@ while doInteg
 	catch errMsg
 		% Error catching
 		if failedOnce
-			t = [0 1];
+			t = [0 norm_tspan(2)];
 			if errDir 
 				storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
 			else
@@ -229,6 +229,12 @@ t = t*(tspan(end)-tspan(1))+tspan(1); %Restore to original units
 if length(tspan)>2
 	Y = interp1(t,Y,tspan);
 	t = tspan;
+else
+    rmIndx = find(t>=tspan(end),1,'first');
+    Y(rmIndx,:) = interp1(t((rmIndx-1):rmIndx),Y((rmIndx-1):rmIndx,:),tspan(end));
+    Y((rmIndx+1):end,:) = [];
+    t(rmIndx) = tspan(end);
+    t((rmIndx+1):end) = [];
 end
 YComp  = Y;
 Y = compDis(modelOut,YComp);      %dissociate complex
