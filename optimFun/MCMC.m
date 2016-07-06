@@ -167,7 +167,7 @@ end
 % Set up random number stream
 if isempty(opts.seed) % If no random seed given. Generate and save
 	mystream = RandStream.create('mrg32k3a','seed',sum(clock*100),'NumStreams',numlab,'StreamIndices',labindx); % Initialise
-	save([opts.dir '/Seed-Slave ' num2str(labindx)],'runVar','opts','mystream');
+	save([opts.dir '/Seed-T_' num2str(opts.T) '-Slave ' num2str(labindx)],'runVar','opts','mystream');
 else                  % Else use the existing seed
 	mystream = opts.seed{labindx};
 end
@@ -185,10 +185,10 @@ tNow = clock; % Current time
 % Create output files if necessary
 outputName = [];
 if strcmpi(opts.disp,'debug')
-    outputName = [opts.dir '/Output-Slave ' num2str(labindx) '.txt'];
+    outputName = [opts.dir '/Output-T_' num2str(opts.T) '-Slave ' num2str(labindx) '.txt'];
     outFileHandle = fopen(outputName,'wt');
 elseif strcmpi(opts.disp,'text') && labindx == 1
-	outputName = [opts.dir '/Output.txt' ];
+	outputName = [opts.dir '/Output-T_' num2str(opts.T) '.txt' ];
     outFileHandle = fopen(outputName,'wt'); 
 elseif labindx~=1 || strcmpi(opts.disp,'off')
 	outFileHandle = []; %If outhandle is [], does not print
@@ -255,7 +255,7 @@ while status == 1
 	
 %Debug workspace saving
 if strcmpi(opts.disp,'debug')
-	save([opts.dir '/DebugWorkspace-Slave' num2str(labindx) '.mat']) %Save entire workspace
+	save([opts.dir '/DebugWorkspace-T_' num2str(opts.T) '-Slave' num2str(labindx) '.mat']) %Save entire workspace
 end
 printCheckpoint('1',outputName,opts.disp);	
 
