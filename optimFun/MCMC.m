@@ -388,16 +388,16 @@ printCheckpoint('5',outputName,opts.disp);
 %       -----------------------------
 % ----- Primary worker progress check ------
 %       -----------------------------
-if sum(ptUniqLocal) >= nprogress*opts.ptNo/opts.dispInt
+if (sum(ptUniqLocal) >= nprogress*opts.ptNo/opts.dispInt) && labindx == 1
 	nprogress = nprogress + 1;
 	tNow = clock;
-	fprintf(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n',(sum(ptUniqLocal)/ptNoMax*100),toc(t1),tNow(4:6));
+	fprintf_cust(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n',(sum(ptUniqLocal)/ptNoMax*100),toc(t1),tNow(4:6));
 	if sum(ptUniqLocal)/ptNoMax >= 1
-		fprintf(outFileHandle,'Current block complete. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		fprintf_cust(outFileHandle,'Current block complete. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		status = 0;
 		if opts.parMode
 			labSend(status,2:numlab,2) %Send stop signal
-			printf(outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+			fprintf_cust(outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		end
 	end
 end
@@ -427,7 +427,7 @@ printCheckpoint('7',outputName,opts.disp);
 if opts.parMode && labindx ~= 1
 	if labProbe(1,2)
 		tNow = clock;
-		fprintf(outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		fprintf_cust(outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		status = labReceive(1,2);
 	end
 end
