@@ -71,11 +71,12 @@ if ~isempty(opts.prior.pts)
 	% Remove points that are 1000x less likely to be true compared to the
 	% best point
 	rmPts = priorP<(1e-3*max(priorP));	
+	priorMin = max(priorP(rmPts));
 	priorP(rmPts) = [];
 	priorLogP(rmPts) = [];
 	priorPts(rmPts,:) = [];
 	% Normalise CDF to 1
-	runVar.priorP = (priorP-min(priorP))/(max(priorP)-min(priorP));
+	runVar.priorP = (priorP-priorMin)/(max(priorP)-priorMin);
     opts.prior.pts = priorPts;
     opts.prior.logP = priorLogP;
 	clear dupIndx rmPts priorLogP priorPts priorP prior rmIndx prir_n
@@ -94,6 +95,11 @@ if opts.parMode
     if parRes == -1
 		opts.parMode = false;
     end
+end
+
+%% Check for whether the working folder exists
+if ~exist(opts.dir,'dir')
+	mkdir(opts.dir);
 end
 
 %% MCMC Kernel split into multi core parallel and single core mode
@@ -210,10 +216,10 @@ if ~isempty(runVar.pt)
 	varNo = length(runVar.pt);
 	opts.resample = Inf; %no resampling when picking one start point
 elseif isfield(runVar,'priorP')
-	varNo = size(opts.prior.pts(1,:),1);
+	varNo = size(opts.prior.pts(1,:),2);
 	rngPt = rand(1);
 	newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
-    runVar.pt    = opts.prior.pts(newPtInd,:);
+    runVar.pt    = opts.prior.pts(newPtInd,:)';
 	runVar.logP  = runVar.obj(runVar.pt);
 elseif isempty(runVar.bnd)
 	error('mcmc:unboundNoPrior','MCMC cannot be run with no boundary when no prior is given')
@@ -235,7 +241,7 @@ end
 % Initialise storage variables (store 10 times more than necessary in case
 % of duplicates)
 ptLocal = zeros(ptNoMax*10,varNo);
-ptUniqLocal = zeros(ptNoMax*10,1);   
+ptUniqLocal = false(ptNoMax*10,1);   
 logPLocal   = nan(ptNoMax*10,1);    
 
 % Initialise run monitors
@@ -268,7 +274,7 @@ if mod(find(isnan(logPLocal),1,'first'),opts.resample)==0
 		% prior
 		rngPt = rand(1);
 		newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
-		ptTest = opts.prior.pts(newPtInd,:);
+		ptTest = opts.prior.pts(newPtInd,:)';
 		logPNew  = runVar.obj(ptTest);
 	else
 		ptTest = seedPt(runVar);
@@ -379,7 +385,11 @@ if runVar.logP/opts.T <= -log(opts.Pmin)
 	pt_n = find(isnan(logPLocal),1,'first');
 	ptUniqLocal(pt_n) = ptUniq;
 	logPLocal(pt_n)   = runVar.logP;
-	ptLocal(pt_n,:)   = runVar.pt;
+	try
+		ptLocal(pt_n,:)   = runVar.pt;
+	catch
+		keyboard
+	end
 	t2 = tic;
 	stallWarn = 0;
 end
