@@ -61,8 +61,8 @@ if ~isempty(opts.prior.pts)
 		prior.pts(rmIndx,:) = [];
 	end
 	% Extract priors
-	priorPts  = prior.pts;
-	priorLogP = prior.logP/opts.T;
+	priorPts  = prior.pts(prior.ptUn,:);
+	priorLogP = prior.logP(prior.ptUn)/opts.T;
 	% Turn objective score into PDF and then CDF for prior
 	[priorP,I] = sort(exp(-priorLogP));
 	priorPts = priorPts(I,:);
