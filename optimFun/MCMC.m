@@ -255,6 +255,11 @@ nprogress = 1;   % Blocks of progress passed (each block is printed as a debug m
 % ============== MCMC Start ================
 % ==========================================
 
+% Initialise lab status
+if opts.parMode  
+ 	otherLabStat = zeros(1,numlabs);
+end
+
 status = 1; % Enter MCMC loop
 runVar.logP = Inf;  %Set this to enter the point selection loop
 %%
@@ -406,7 +411,7 @@ if (sum(ptUniqLocal) >= nprogress*opts.ptNo/opts.dispInt) && labindx == 1
 	nprogress = nprogress + 1;
 	tNow = clock;
 	fprintf_cust(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n',(sum(ptUniqLocal)/ptNoMax*100),toc(t1),tNow(4:6));
-	if sum(ptUniqLocal)/ptNoMax >= 1
+    if sum(ptUniqLocal)/ptNoMax >= 1
 		fprintf_cust(outFileHandle,'Current block complete. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		status = 0;
 		if opts.parMode
@@ -450,23 +455,29 @@ printCheckpoint('8',outputName,opts.disp);
 %       -----------------------------------------------
 % ----- Send data from secondary work to primary worker ------
 %       -----------------------------------------------
-if labindx == 1 && opts.parMode
+if labindx == 1 && opts.parMode && status == 1
 	while labProbe('any',1)
-		[dat,srcIndx] = labReceive();
-		ptNew     = dat{1};
-		logPNew   = dat{2};
-		ptUniqNew = dat{3};
-		pt_n = find(isnan(logPLocal),1,'first');
-		pt_n_New = length(logPNew);
-		pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
-		ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
-		ptUniqLocal((pt_n+1):(pt_n+pt_n_Get)) = ptUniqNew(1:pt_n_Get,:);
-		logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
-		tNow = clock;
-		fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
+		[dat,srcIndx] = labReceive('any');
+		if isnumeric(dat)
+			otherLabStat(srcIndx) = dat;
+		else
+			ptNew     = dat{1};
+			logPNew   = dat{2};
+			ptUniqNew = dat{3};
+			pt_n = find(isnan(logPLocal),1,'first');
+			pt_n_New = length(logPNew);
+			ptLocal((pt_n+1):(pt_n+pt_n_New),:) = ptNew(1:pt_n_New,:);
+			ptUniqLocal((pt_n+1):(pt_n+pt_n_New)) = ptUniqNew(1:pt_n_New,:);
+			logPLocal((pt_n+1):(pt_n+pt_n_New)) = logPNew(1:pt_n_New,:);
+			if ~strcmpi(opts.disp,'off')
+				tNow = clock;
+				fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
+            end
+		end
 	end
 elseif (labindx > 1 && nansum(ptUniqLocal) == ptNoMax) && status == 1
-	labSend({ptLocal,logPLocal,ptUniqLocal},1,1);
+    ptLast = find(~isnan(logPLocal),1,'last');
+	labSend({ptLocal(1:ptLast,:),logPLocal(1:ptLast),ptUniqLocal(1:ptLast)},1,1);
 	ptUniqLocal = false(size(logPLocal));
 	logPLocal = nan(size(logPLocal));
 	ptLocal = zeros(size(ptLocal));
@@ -485,26 +496,24 @@ printCheckpoint('10',outputName,opts.disp)
 
 t3 = tic; %end timer
 if labindx == 1 && opts.parMode
-	otherLabStat = zeros(1,numlabs);
 	otherLabStat(1) = 11; %Set successful exit for lab 1
 	while any(otherLabStat~=11) %If any lab still hasn't successfully exited run, keep trying to receive data. If any "otherLabStat" is not 11, then there is still at least 1 labSend left to go.
-		[dat,srcIndx] = labReceive('any');
-		if isdouble(dat)
-			otherLabStat(scrIndx-1) = dat;
+        [dat,srcIndx] = labReceive('any');
+		if isnumeric(dat)
+			otherLabStat(srcIndx) = dat;
 		else
 			ptNew     = dat{1};
 			logPNew   = dat{2};
 			ptUniqNew = dat{3};
 			pt_n = find(isnan(logPLocal),1,'first');
 			pt_n_New = length(logPNew);
-			pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
-			ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
-			ptUniqLocal((pt_n+1):(pt_n+pt_n_Get)) = ptUniqNew(1:pt_n_Get,:);
-			logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
+			ptLocal((pt_n+1):(pt_n+pt_n_New),:) = ptNew(1:pt_n_New,:);
+			ptUniqLocal((pt_n+1):(pt_n+pt_n_New)) = ptUniqNew(1:pt_n_New,:);
+			logPLocal((pt_n+1):(pt_n+pt_n_New)) = logPNew(1:pt_n_New,:);
 			if ~strcmpi(opts.disp,'off')
 				tNow = clock;
-				fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,ii,tNow(4:6));
-			end
+				fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
+            end
 		end
 		if toc(t3)>600
 			fprintf_cust(outFileHandle,'Still waiting on labs...');
@@ -518,10 +527,6 @@ end
 
 printCheckpoint('11',outputName,opts.disp)
     
-if opts.parMode
-	labBarrier
-end
-
 fprintf_cust(outFileHandle,'--------------------------------\n');
 fprintf_cust(outFileHandle,'------------Run Ended-----------\n');
 fprintf_cust(outFileHandle,'--------------------------------\n\n\n');
@@ -644,6 +649,7 @@ end
 
 function out = fprintf_cust(outFileHandle,text,varargin)
 	if ~isempty(outFileHandle)
+        pause(0.1)
 		out = fprintf(outFileHandle,text,varargin{:});
 	end
 end
