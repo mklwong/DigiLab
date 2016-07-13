@@ -245,10 +245,11 @@ ptUniqLocal = false(ptNoMax*10,1);
 logPLocal   = nan(ptNoMax*10,1);    
 
 % Initialise run monitors
+stepCount = 1;   % Total number of steps (independent of Pmin threshold)
+RjtCount  = 0;   % Continuous rejection count
 stallWarn = 0;   % Number of stall cycles triggered (program stops when this hits 10)
 pltHndl   = [];  % For initialising the program into the first plot of the run
 nprogress = 1;   % Blocks of progress passed (each block is printed as a debug message)
-
 
 % ==========================================
 % ============== MCMC Start ================
@@ -268,7 +269,7 @@ printCheckpoint('1',outputName,opts.disp);
 %      --------------------
 % ----- Find new seed point ------
 %      --------------------
-if mod(find(isnan(logPLocal),1,'first'),opts.resample)==0
+if mod(stepCount,opts.resample)==0
 	if ~isempty(opts.prior.pts)
 		% Select new point from prior based on goodness of fit of the
 		% prior
@@ -284,11 +285,12 @@ if mod(find(isnan(logPLocal),1,'first'),opts.resample)==0
 	% Metropolis acceptance criteria for new point
 	thres    = rand(1);
 	testProb = min([1 exp(-(logPNew-runVar.logP)/opts.T)]);
-	if testProb > thres
+	if (testProb > thres) || rjtCount > opts.resample
 		runVar.pt = ptTest;
 		runVar.logP = logPNew;
 		% Reinitialise MCMC parameters
 		opts.step = ones(size(runVar.bnd(:,1)))*opts.stepi;
+		rjtCount = 0;
 	end
 end
 printCheckpoint('2',outputName,opts.disp);
@@ -298,6 +300,7 @@ printCheckpoint('2',outputName,opts.disp);
 %      --------------------
 [runVar,opts] = MCMCEvolve(runVar,opts);
 runVar = opts.adaptFun(runVar,opts);
+stepCount = stepCount + 1;
 
 if mod(floor(toc(t1))/60,10) == 0 && strcmpi(opts.disp,'text')
 	tNow = clock;
@@ -381,17 +384,18 @@ if runVar.logP/opts.T <= -log(opts.Pmin)
 	ptUniq = false;
 	if runVar.ptTest(end)
 		ptUniq = true;
+		RjtCount = 0;
+	else
+		RjtCount = RjtCount + 1;
 	end
 	pt_n = find(isnan(logPLocal),1,'first');
 	ptUniqLocal(pt_n) = ptUniq;
 	logPLocal(pt_n)   = runVar.logP;
-	try
-		ptLocal(pt_n,:)   = runVar.pt;
-	catch
-		keyboard
-	end
+	ptLocal(pt_n,:)   = runVar.pt;
 	t2 = tic;
 	stallWarn = 0;
+else
+	RjtCount = RjtCount + 1;
 end
 printCheckpoint('5',outputName,opts.disp);
     
@@ -478,25 +482,38 @@ printCheckpoint('10',outputName,opts.disp)
 %       -----------------------------------------------------
 % ----- Cycle through each secondary worker and look for data ------
 %       -----------------------------------------------------
+
+t3 = tic; %end timer
 if labindx == 1 && opts.parMode
-    for ii = 2:numlabs
-        if labProbe(ii)
-            [dat,srcIndx] = labReceive(ii);
-            ptNew     = dat{1};
-            logPNew   = dat{2};
+	otherLabStat = zeros(1,numlabs);
+	otherLabStat(1) = 11; %Set successful exit for lab 1
+	while any(otherLabStat~=11) %If any lab still hasn't successfully exited run, keep trying to receive data. If any "otherLabStat" is not 11, then there is still at least 1 labSend left to go.
+		[dat,srcIndx] = labReceive('any');
+		if isdouble(dat)
+			otherLabStat(scrIndx-1) = dat;
+		else
+			ptNew     = dat{1};
+			logPNew   = dat{2};
 			ptUniqNew = dat{3};
 			pt_n = find(isnan(logPLocal),1,'first');
-            pt_n_New = length(logPNew);
-            pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
-            ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
+			pt_n_New = length(logPNew);
+			pt_n_Get = min([ptNoMax-pt_n pt_n_New]);
+			ptLocal((pt_n+1):(pt_n+pt_n_Get),:) = ptNew(1:pt_n_Get,:);
 			ptUniqLocal((pt_n+1):(pt_n+pt_n_Get)) = ptUniqNew(1:pt_n_Get,:);
-            logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
-            if ~strcmpi(opts.disp,'off')
-                tNow = clock;
-                fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,ii,tNow(4:6));
-            end
-        end
-    end
+			logPLocal((pt_n+1):(pt_n+pt_n_Get)) = logPNew(1:pt_n_Get,:);
+			if ~strcmpi(opts.disp,'off')
+				tNow = clock;
+				fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,ii,tNow(4:6));
+			end
+		end
+		if toc(t3)>600
+			fprintf_cust(outFileHandle,'Still waiting on labs...');
+			fprintf_cust(outFileHandle,':%d',find(otherLabStat~=11));
+			fprintf_cust(outFileHandle,'\n');
+		end
+	end
+elseif opts.parMode
+	labSend(11,1); %Send successful exit message back to lab 1.
 end
 
 printCheckpoint('11',outputName,opts.disp)

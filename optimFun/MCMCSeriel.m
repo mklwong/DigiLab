@@ -142,7 +142,7 @@ while ii ~= length(T)+1
 	end
 	result.logP  = logPnew;
 	result.pts   = ptsNew;
-	result.ptUnq = ptsUniq;
+	result.ptUn = ptsUniq;
 	result.T     = T(ii);
 	result.model = model;
 	result.best  = pts(logP==min(logP),:);
