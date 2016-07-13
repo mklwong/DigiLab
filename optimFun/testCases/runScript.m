@@ -1,4 +1,4 @@
-opts = MCMCOptimset('display','terminal','T',10,'parMode',2,'ptNo',10000,'Pmin',0);
+opts = MCMCOptimset('display','terminal','T',10,'parMode',2,'ptNo',100000,'Pmin',0);
 
 % Rosenbrock function
 opts = MCMCOptimset(opts,'dir','./Rosenbrock');
@@ -13,13 +13,13 @@ shading interp
 xlim(bnd(1,:))
 ylim(bnd(2,:))
 subplot(2,1,2);
-surf(X,Y,exp(-Z))
+surf(X,Y,10.^(-Z))
 shading interp
 view(2)
 
 % Ackley's function
 opts = MCMCOptimset(opts,'dir','./Ackleys');
-obj = @(X,Y) -5*log10(1-((-20*exp(-0.2*sqrt(0.5*(X.^2+Y.^2)))-exp(0.5*(cos(2*pi()*X)+cos(2*pi()*Y)))+exp(1)+20)/14.4));
+obj = @(X,Y) -log10((1-(((-20*exp(-0.2*sqrt(0.5*(X.^2+Y.^2)))-exp(0.5*(cos(2*pi()*X)+cos(2*pi()*Y)))+exp(1)+20)-0.10168)/14.5)));
 bnd = [-5 5; -5 5];
 pts = optimFuncTest(@(p)obj(p(1),p(2)),bnd,opts);
 [X,Y,Z] = surfFuncTest(obj,bnd);
@@ -30,7 +30,7 @@ xlim(bnd(1,:))
 ylim(bnd(2,:))
 shading interp
 subplot(2,1,2);
-surf(X,Y,(-Z))
+surf(X,Y,10.^(-Z))
 shading interp
 view(2)
 
@@ -47,6 +47,6 @@ xlim(bnd(1,:))
 ylim(bnd(2,:))
 shading interp
 subplot(2,1,2);
-surf(X,Y,exp(-Z))
+surf(X,Y,10.^(-Z))
 shading interp
 view(2)
