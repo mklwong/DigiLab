@@ -246,7 +246,7 @@ logPLocal   = nan(ptNoMax*10,1);
 
 % Initialise run monitors
 stepCount = 1;   % Total number of steps (independent of Pmin threshold)
-RjtCount  = 0;   % Continuous rejection count
+rjtCount  = 0;   % Continuous rejection count
 stallWarn = 0;   % Number of stall cycles triggered (program stops when this hits 10)
 pltHndl   = [];  % For initialising the program into the first plot of the run
 nprogress = 1;   % Blocks of progress passed (each block is printed as a debug message)
