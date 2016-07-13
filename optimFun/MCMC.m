@@ -389,9 +389,9 @@ if runVar.logP/opts.T <= -log(opts.Pmin)
 	ptUniq = false;
 	if runVar.ptTest(end)
 		ptUniq = true;
-		RjtCount = 0;
-	else
-		RjtCount = RjtCount + 1;
+		rjtCount = 0;
+    else
+        rjtCount = rjtCount + 1;
 	end
 	pt_n = find(isnan(logPLocal),1,'first');
 	ptUniqLocal(pt_n) = ptUniq;
@@ -400,7 +400,7 @@ if runVar.logP/opts.T <= -log(opts.Pmin)
 	t2 = tic;
 	stallWarn = 0;
 else
-	RjtCount = RjtCount + 1;
+	rjtCount = rjtCount + 1;
 end
 printCheckpoint('5',outputName,opts.disp);
     
