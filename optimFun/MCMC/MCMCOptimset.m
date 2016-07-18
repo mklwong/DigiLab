@@ -1,6 +1,6 @@
 function varargout = MCMCOptimset(varargin)
 
-% MCMCoptimset sets the options required for the MCMC function
+% MCMCOptimset sets the options required for the MCMC function
 %   OPTIONS = MCMCoptimset('PARAM1',VALUE1,'PARAM2',VALUE2,...) creates a
 %   structure in OPTIONS that can be inputted into the MCMC algorithm.
 %
@@ -17,7 +17,7 @@ function varargout = MCMCOptimset(varargin)
 %               representative figure of it's progress in parameter space.
 %               Value must be boolean.                           (Default = false) 
 %
-%   OPTIONS = MCMCoptimset outputs the default option.
+%   OPTIONS = MCMCOptimset outputs the default option.
 
 %========================%
 %== Option Definitions ==%

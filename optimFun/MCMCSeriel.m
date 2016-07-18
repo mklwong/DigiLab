@@ -124,7 +124,7 @@ while ii ~= length(T)+1
     fprintf('\n**** MCMC Start ****\n')
     fprintf('Tempering at T = %6.2f\n',T(ii))
     opts = MCMCOptimset(opts,'T',T(ii)','Prior',prir);
-    [pts,logP,status] = MCMC(objFun,[],model.pFit.lim,opts);
+    [pts,logP,ptsUniq,status] = MCMC(objFun,[],model.pFit.lim,opts);
     
     fprintf('Temperature %6.2f done after %7.1f seconds.\n',T(ii),toc(t1))
     
@@ -142,6 +142,7 @@ while ii ~= length(T)+1
 	end
 	result.logP  = logPnew;
 	result.pts   = ptsNew;
+	result.ptUn = ptsUniq;
 	result.T     = T(ii);
 	result.model = model;
 	result.best  = pts(logP==min(logP),:);

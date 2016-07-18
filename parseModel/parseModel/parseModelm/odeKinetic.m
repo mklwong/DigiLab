@@ -300,6 +300,7 @@ elseif length(varargin) == 1
 	tspan = [0 1]; %no non-dimensionalise
 end
 
+model.matInd = []; %Initialise matrix index order (to be used in dynEqn component).
 for ii = 1:length(model.param)
 	switch lower(model.param(ii).name)
 		case 'k0'
@@ -315,21 +316,25 @@ for ii = 1:length(model.param)
             if ~all(size(model.param(ii).matVal)==length(model.modSpc))
                 model.param(ii).matVal(length(model.modSpc),length(model.modSpc))=0;
             end
+            model.matInd(1) = ii;
 		case 'k2'
 			model.param(ii).matVal = nonDim(model.param(ii).matVal,tspan,5);
             compUsed = min(model.comp(model.param(ii).matVal(:,[2 3])),[],2);
             model.param(ii).matVal(:,4) = compUsed.*model.param(ii).matVal(:,5).*model.param(ii).matVal(:,4);
             model.param(ii).matVal(:,5) = [];
+            model.matInd(2) = ii;
 		case 'km'
 			compUsed = min(model.comp(model.param(ii).matVal(:,[2 3])),[],2);
             model.param(ii).matVal(:,4) = model.comp(model.param(ii).matVal(:,1)).*model.param(ii).matVal(:,5)./(model.param(ii).matVal(:,4).*compUsed);
             model.param(ii).matVal(:,5) = [];
+            model.matInd(3) = ii;
 		case 'hill'
             % go from [ind1 ind2 ind3 r k Km n] to [ind1 ind2 ind3 r*k*V Km n]
 			model.param(ii).matVal = nonDim(model.param(ii).matVal,tspan,5);
             compUsed = min(model.comp(model.param(ii).matVal(:,[2 3])),[],2);
             model.param(ii).matVal(:,4) = compUsed.*model.param(ii).matVal(:,4).*model.param(ii).matVal(:,5);
             model.param(ii).matVal(:,5) = [];
+            model.matInd(4) = ii;
 		end
 end
 
@@ -342,32 +347,29 @@ case 'dyneqn'
 
 [t,x,model] = varargin{:};
 
-% ~~Finding indices of matrices~~
-[~,matInd] = ismember({model.param.name},{'k1','k2','Km','Hill'});
-
 % ~~Initialise matrices~~
 G = zeros(length(model.modSpc));
 V = G;
 HillTerm = G;
 
 % ~~Construction of k1 matrix~~
-WInd = find(matInd==1);
+WInd = model.matInd(1);
 W = model.param(WInd).matVal;
 
 % ~~Construction of k2 matrix~~
-VInd = find(matInd==2);
+VInd = model.matInd(2);
 VTmp = sparse(model.param(VInd).matVal(:,1),model.param(VInd).matVal(:,2),x(model.param(VInd).matVal(:,3)).*model.param(VInd).matVal(:,4));
 [a,b] = size(VTmp);
 V(1:a,1:b) = VTmp;
 
 % ~~Construction of G matrix~~
-GInd = find(matInd==3);
+GInd = model.matInd(3);
 GTmp = sparse(model.param(GInd).matVal(:,1),model.param(GInd).matVal(:,2),x(model.param(GInd).matVal(:,3))./model.param(GInd).matVal(:,4));
 [a,b] = size(GTmp);
 G(1:a,1:b) = GTmp;
 
 % ~~Construction of HillFun matrix~~
-HillInd = find(matInd==4);
+HillInd = model.matInd(4);
 HillRatio = (x(model.param(HillInd).matVal(:,3))./model.param(HillInd).matVal(:,5)).^model.param(HillInd).matVal(:,6);
 HillVal = model.param(HillInd).matVal(:,4).*HillRatio./(HillRatio+1);
 HillTmp = sparse(model.param(HillInd).matVal(:,1),model.param(HillInd).matVal(:,2),HillVal);
