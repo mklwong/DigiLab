@@ -23,37 +23,34 @@ function varargout = MCMCOptimset(varargin)
 %== Option Definitions ==%
 %========================%
 
-Names = ['PtNo     ' %number of points to store  | defaults at 10,000
-		 'T        ' %value greater than zero    | defaults to 1
-         'prior    ' %struct                     | defaults to empty
-         'Pmin     ' %value less than one        | defaults to 0
-		 'AcptRto  ' %Acceptance ratio before    | defaults to 0.5
-		             %changing step size
-         'display  ' %full, text, track or off   | defaults to text
-					 %*full displays plot and all|
-					 % outputs                   |
-					 %*text displays
-		 'DispInt  ' %display interval: number of| defaults to 10
-		             %times the program prints   |
-				 	 %a completion percentage    | 
-		 'Walltime ' %max run time in mins       | defaults to 60
-		 'Stepi    ' %starting average step size | defaults to 0.25
-         'adaptFun ' %function handle of how     | defaults to "adaptStep.m"
-                     %MCMC step is adapted       |
-                     %function of (scenario,pt0,pt1,step)
-		 'PropDis  ' %function handle as function| defaults to "propDis.m"
-		             %of (p,bounds,stepsize)     |
-		 'ParMode  ' %on or off                  | defaults to off
-		 'PassNo   ' %Number of points stored    | defaults at 500
-		             %before passing.            |
-		 'Resample ' %Number of points stepped   | defaults at 50
-		             %before attempting a new    |
-					 %point (new point chosen    |
-					 %subject to metropolis      |
-					 %algorithm).                |
-		 'maxStep  ' %Maximum step size          | defaults at 1
-		 'dir      ' %String for output location | defaults at blank
-		 'seed     ' %Initialisation seed        | defaults empty
+Names = ['PtNo       ' %number of points to store    | defaults at 10,000
+		 'T          ' %value greater than zero      | defaults to 1
+         'prior      ' %struct                       | defaults to empty
+         'Pmin       ' %value less than one          | defaults to 0
+		 'AcceptRatio' %Acceptance ratio before      | defaults to 0.5
+		               %changing step size
+         'display    ' %debug, text, terminal or off | defaults to text
+		 'DispInt    ' %display interval: number of  | defaults to 10
+		               %times the program prints     |
+				 	   %a completion percentage      | 
+		 'Walltime   ' %max run time in mins         | defaults to 60
+		 'Stepi      ' %starting average step size   | defaults to 0.25
+         'adaptFun   ' %function handle of how       | defaults to "adaptStep.m"
+                       %MCMC step is adapted         |
+                       %function of (scenario,pt0,pt1,step)
+		 'PropDis    ' %function handle as function  | defaults to "propDis.m"
+		               %of (p,bounds,stepsize)       |
+		 'ParMode    ' %on or off                    | defaults to off
+		 'PassNo     ' %Number of points stored      | defaults at 500
+		               %before passing.              |
+		 'Resample   ' %Number of points stepped     | defaults at 50
+		               %before attempting a new      |
+					   %point (new point chosen      |
+				  	   %subject to metropolis        |
+					   %algorithm).                  |
+		 'maxStep    ' %Maximum step size            | defaults at 1
+		 'dir        ' %String for output location   | defaults at blank
+		 'seed       ' %Initialisation seed          | defaults empty
 		 ];         
      
 %===============================%

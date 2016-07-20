@@ -25,3 +25,7 @@ for ii = 2:length(varargin)
 end
 
 allResult.best = allResult.pts(allResult.logP==min(allResult.logP),:);
+
+[allResult.logP,I] = sort(allResult.logP,'ascend');
+allResult.pts = allResult.pts(I,:);
+allResult.ptUn = allResult.ptUn(I);

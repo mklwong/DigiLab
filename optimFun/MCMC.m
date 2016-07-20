@@ -1,36 +1,40 @@
-function [pts,logP,ptUniq,status] = MCMC(objfun,pt0,bnd,opts)
+function [pts,logP,ptUnique,status] = MCMC(objfun,pt0,bndry,opts)
 
-% [pstrir,P] = MCMC(objfun,pt0,bnd,opts)
+% [pstrir,P] = MCMC(objfun,pt0,bndry,opts)
 %
-% Note the outputted probability is -log(P) of the real probability.
+% Note the outputed probability is value of the objective function. It is
+% assumed that the relationship between the objective function and the
+% likelihood is P = exp[-objfun(p)]
 %
 % MCMC chain with tempering.
 %
-% model = scenario file for model
-% ptNo = number of points that will form the posterior
-% U    = experimental training data
+% objfun = Objective function to be explored.
+% pt0    = Starting point for the MCMC chain. Can be left blank for a
+%          random start point to be chosen automatically.
+% bndry  = Boundry within which the MCMC algorithm will be restricted
+%          within. This is an N x 2 matrix where N is the number of
+%          parameters to be fitted. The first column contains the lower
+%          bounds while the second column contains the upper bounds.
+% Opts   = A struct that contains MCMC settings. It is advised that this be
+%          generated using MCMCOptimset
 %
-% Opts is a struct that contains optional parameters
-% T    = annealing temperature
-% prior = the results prior from a previous saved MCMCSeriel run
-% Pmin = Minimum tempered probability required for acceptance into
-%        posterior
-%
-% If prior is empty, then the MCMC generates from scratch. Else, the 
-% program will randomly sample from the prior every so often.
+% pt0 and bndry are both optional inputs, but AT LEAST ONE of these input
+% arguments must be entered. This is because the randomised start point
+% requires a finite space to sample from. Conversely an unbounded search
+% must have a defined starting point.
 
 %% Input Parameter Integrity Check
 %== Parameter 3: Boundary ==%
-bnd = sort(bnd,2); %Make sure boundary is sorted as lower bound in first column and upper bound in second column
+bndry = sort(bndry,2); %Make sure boundary is sorted as lower bound in first column and upper bound in second column
 
 %== Parameter 2: Initial point ==%
 if ~isempty(pt0)
 	if isrow(pt0)
 		pt0 = pt0';
 	end
-	if ~isempty(bnd)
-		if any(pt0<bnd(:,1) | pt0>bnd(:,2))
-			find(pt0<bnd(:,1) | pt0>bnd(:,2))
+	if ~isempty(bndry)
+		if any(pt0<bndry(:,1) | pt0>bndry(:,2))
+			find(pt0<bndry(:,1) | pt0>bndry(:,2))
 			error('MCMC:InitialPointOutOfBound','Initial point is outside the required boundary.')
 		end
 	end
@@ -48,7 +52,7 @@ end
 %% Condensing input parameters for passing into MCMC Kernel
 runVar.pt = pt0;
 runVar.obj = objfun;
-runVar.bnd = bnd;
+runVar.bnd = bndry;
 
 %% Preprocessing Prior such that only highest probabilities points are considered
 if ~isempty(opts.prior.pts)
@@ -106,12 +110,12 @@ end
 if opts.parMode
 	spmd
         warningSwitch('off')
-		[ptRaw,logPRaw,ptUniqRaw,status] = MCMCKernel(runVar,opts);
+		[ptRaw,logPRaw,ptUniqueRaw,status] = MCMCKernel(runVar,opts);
 		warningSwitch('on')
 	end
 else
     warningSwitch('off')
-    [ptRaw,logPRaw,ptUniqRaw,status] = MCMCKernel(runVar,opts);
+    [ptRaw,logPRaw,ptUniqueRaw,status] = MCMCKernel(runVar,opts);
 	warningSwitch('on')
 end
 
@@ -120,11 +124,11 @@ end
 status = status{1};
 pts    = ptRaw{1};
 logP   = logPRaw{1};
-ptUniq = ptUniqRaw{1};
+ptUnique = ptUniqueRaw{1};
 
 % Remove unused data slots
 pts(isnan(logP),:) = [];
-ptUniq(isnan(logP)) = [];
+ptUnique(isnan(logP)) = [];
 logP(isnan(logP))  = [];  
 
 end
@@ -425,7 +429,7 @@ printCheckpoint('6',outputName,opts.disp);
 %       ------------------------------
 % ----- Stall check (lack of progress) ------
 %       ------------------------------
-if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10)
+if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10) && status~=0
 	stallWarn = stallWarn + 1;
 	tNow = clock;
 	fprintf_cust(outFileHandle,'Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)  | (%2.0f:%2.0f:%2.0f) \n',stallWarn,toc(t1),toc(t2),tNow(4:6));
@@ -494,31 +498,39 @@ printCheckpoint('10',outputName,opts.disp)
 % ----- Cycle through each secondary worker and look for data ------
 %       -----------------------------------------------------
 
+fprintf_cust(outFileHandle,'Cycling through slave-labs to complete outstanding data transfers.\n')
 t3 = tic; %end timer
 if labindx == 1 && opts.parMode
 	otherLabStat(1) = 11; %Set successful exit for lab 1
 	while any(otherLabStat~=11) %If any lab still hasn't successfully exited run, keep trying to receive data. If any "otherLabStat" is not 11, then there is still at least 1 labSend left to go.
-        [dat,srcIndx] = labReceive('any');
-		if isnumeric(dat)
-			otherLabStat(srcIndx) = dat;
-		else
-			ptNew     = dat{1};
-			logPNew   = dat{2};
-			ptUniqNew = dat{3};
-			pt_n = find(isnan(logPLocal),1,'first');
-			pt_n_New = length(logPNew);
-			ptLocal((pt_n+1):(pt_n+pt_n_New),:) = ptNew(1:pt_n_New,:);
-			ptUniqLocal((pt_n+1):(pt_n+pt_n_New)) = ptUniqNew(1:pt_n_New,:);
-			logPLocal((pt_n+1):(pt_n+pt_n_New)) = logPNew(1:pt_n_New,:);
-			if ~strcmpi(opts.disp,'off')
-				tNow = clock;
-				fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
-            end
+        if labProbe('any')
+			[dat,srcIndx] = labReceive('any');
+			if isnumeric(dat)
+				otherLabStat(srcIndx) = dat;
+			else
+				ptNew     = dat{1};
+				logPNew   = dat{2};
+				ptUniqNew = dat{3};
+				pt_n = find(isnan(logPLocal),1,'first');
+				pt_n_New = length(logPNew);
+				ptLocal((pt_n+1):(pt_n+pt_n_New),:) = ptNew(1:pt_n_New,:);
+				ptUniqLocal((pt_n+1):(pt_n+pt_n_New)) = ptUniqNew(1:pt_n_New,:);
+				logPLocal((pt_n+1):(pt_n+pt_n_New)) = logPNew(1:pt_n_New,:);
+				if ~strcmpi(opts.disp,'off')
+					tNow = clock;
+					fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
+				end
+			end
 		end
-		if toc(t3)>600
+		pause(1)
+		if toc(t3)> 600
+			fprintf_cust(outFileHandle,'Waiting too long, quiting...\n');
+			break
+		elseif mod(toc(t3),30)>0 && mod(toc(t3),30) <1
 			fprintf_cust(outFileHandle,'Still waiting on labs...');
 			fprintf_cust(outFileHandle,':%d',find(otherLabStat~=11));
 			fprintf_cust(outFileHandle,'\n');
+			labSend(status,2:numlab,2)
 		end
 	end
 elseif opts.parMode
