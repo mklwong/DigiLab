@@ -52,6 +52,9 @@ if isempty(prirDat)
 elseif exist([modelLoc prirDat],'file') == 2
     load([modelLoc prirDat]); % Load prior file
     fprintf('prior file Loaded.\n')
+elseif exist(prirDat,'file') == 2
+    load(prirDat); % Load prior file
+    fprintf('prior file Loaded.\n')
 else
 	error('Specified prior not found')
 end
