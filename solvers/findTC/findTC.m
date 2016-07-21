@@ -175,6 +175,7 @@ if ~noRamp
 		modelRamp = modelOut;
 		modelRamp.sigma = @(t) x0*2*normpdf(t,0,0.2);
 	end
+	modelRamp.time = tic;
 	dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelRamp);
 	try
 		[t,Y] = ode15s(dx_dt,[0 (1-1e-6) 1],x0*0,options);
@@ -199,8 +200,8 @@ if ~noBasal
 	modelOut.sigma = @(t) modelOut.sigma(t) + inpConst*2*normpdf(t,0,1e-6);
 end
 
+modelOut.time = tic;
 dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelOut);
-
 
 failedOnce = false;
 while doInteg

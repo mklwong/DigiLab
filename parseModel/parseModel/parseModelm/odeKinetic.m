@@ -347,6 +347,13 @@ case 'dyneqn'
 
 [t,x,model] = varargin{:};
 
+% ~~Timer constrain~~
+% Time constrain is set to 10 seconds (no solution should take longer than
+% this)
+if toc(model.time)>10
+	error('odeKinetic:SolveTakingTooLong','ODE solver has taken longer than 10 seconds to complete.') 
+end
+
 % ~~Initialise matrices~~
 G = zeros(length(model.modSpc));
 V = G;
