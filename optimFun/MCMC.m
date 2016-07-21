@@ -278,7 +278,7 @@ printCheckpoint('1',outputName,opts.disp);
 % ----- Find new seed point ------
 %      --------------------
 if mod(stepCount,opts.resample)==0
-	if ~isempty(opts.runVar.priorP)
+	if ~isempty(runVar.priorP)
 		% Select new point from prior based on goodness of fit of the
 		% prior
 		rngPt = rand(1);
