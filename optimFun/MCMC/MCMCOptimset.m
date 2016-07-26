@@ -40,7 +40,7 @@ Names = ['PtNo       ' %number of points to store    | defaults at 10,000
                        %function of (scenario,pt0,pt1,step)
 		 'PropDis    ' %function handle as function  | defaults to "propDis.m"
 		               %of (p,bounds,stepsize)       |
-		 'ParMode    ' %on or off                    | defaults to off
+		 'ParMode    ' %true, number or false        | defaults to true
 		 'PassNo     ' %Number of points stored      | defaults at 500
 		               %before passing.              |
 		 'Resample   ' %Number of points stepped     | defaults at 50
