@@ -193,23 +193,23 @@ t2   = tic;   % t2 is the time to last completion checkpoint
 tNow = clock; % Current time
 
 % Create output files if necessary
-outputName = [];
+runVar.outputName = [];
 if strcmpi(opts.disp,'debug')
-    outputName = [opts.dir '/Output-T_' num2str(opts.T) '-Slave ' num2str(labindx) '.txt'];
-    outFileHandle = fopen(outputName,'wt');
+    runVar.outputName = [opts.dir '/Output-T_' num2str(opts.T) '-Slave ' num2str(labindx) '.txt'];
+    runVar.outFileHandle = fopen(runVar.outputName,'wt');
 elseif strcmpi(opts.disp,'text') && labindx == 1
-	outputName = [opts.dir '/Output-T_' num2str(opts.T) '.txt' ];
-    outFileHandle = fopen(outputName,'wt'); 
+	runVar.outputName = [opts.dir '/Output-T_' num2str(opts.T) '.txt' ];
+    runVar.outFileHandle = fopen(runVar.outputName,'wt'); 
 elseif labindx~=1 || strcmpi(opts.disp,'off')
-	outFileHandle = []; %If outhandle is [], does not print
+	runVar.outFileHandle = []; %If outhandle is [], does not print
 else 
-    outFileHandle = 1;  %If outhandle is 1, prints to terminal
+    runVar.outFileHandle = 1;  %If outhandle is 1, prints to terminal
 end
-fprintf_cust(outFileHandle,'-------------------------------\n');
-fprintf_cust(outFileHandle,'--------Run Information--------\n');
-fprintf_cust(outFileHandle,'-------------------------------\n');
-fprintf_cust(outFileHandle,'T = %1.2f | ',opts.T);
-fprintf_cust(outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f (%2.0f-%2.0f-%4.0f) \n',tNow([4:6 3:-1:1]));
+fprintf_cust(runVar.outFileHandle,'-------------------------------\n');
+fprintf_cust(runVar.outFileHandle,'--------Run Information--------\n');
+fprintf_cust(runVar.outFileHandle,'-------------------------------\n');
+fprintf_cust(runVar.outFileHandle,'T = %1.2f | ',opts.T);
+fprintf_cust(runVar.outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f (%2.0f-%2.0f-%4.0f) \n',tNow([4:6 3:-1:1]));
 
 %      -------------------------
 % ----- Initialise Run Variables ------
@@ -268,11 +268,7 @@ runVar.logP = Inf;  %Set this to enter the point selection loop
 %%
 while status == 1
 	
-%Debug workspace saving
-if strcmpi(opts.disp,'debug')
-	save([opts.dir '/DebugWorkspace-T_' num2str(opts.T) '-Slave' num2str(labindx) '.mat']) %Save entire workspace
-end
-printCheckpoint('1',outputName,opts.disp);	
+printCheckpoint('1',runVar.outputName,opts.disp);	
 
 %      --------------------
 % ----- Find new seed point ------
@@ -301,20 +297,23 @@ if mod(stepCount,opts.resample)==0
 		rjtCount = 0;
 	end
 end
-printCheckpoint('2',outputName,opts.disp);
+
    
 %      --------------------
 % ----- Evolve Active Point ------
 %      --------------------
+printCheckpoint('2.1',runVar.outputName,opts.disp);
 [runVar,opts] = MCMCEvolve(runVar,opts);
+printCheckpoint('2.2',runVar.outputName,opts.disp);
 runVar = opts.adaptFun(runVar,opts);
+printCheckpoint('2.3',runVar.outputName,opts.disp);
 stepCount = stepCount + 1;
 
 if mod(floor(toc(t1))/60,10) == 0 && strcmpi(opts.disp,'text')
 	tNow = clock;
 	fprintf_cust(outFileHandle,'Time elapsed - %1.0f | Real time - %2.0f:%2.0f:%2.0f \n',floor(toc(t1)/60),tNow(4:6));
 end
-printCheckpoint('3',outputName,opts.disp);
+printCheckpoint('3',runVar.outputName,opts.disp);
 
 %      ----------------------------
 % ----- Plot Distribution of Points ------
@@ -383,7 +382,12 @@ if ~opts.parMode && strcmpi(opts.disp,'full')
 		drawnow
 	end
 end
-printCheckpoint('4',outputName,opts.disp);
+printCheckpoint('4',runVar.outputName,opts.disp);
+
+%Debug workspace saving
+if strcmpi(opts.disp,'debug')
+	save([opts.dir '/DebugWorkspace-T_' num2str(opts.T) '-Slave' num2str(labindx) '.mat']) %Save entire workspace
+end
 
 %       ---------------------
 % ----- Store point in worker ------
@@ -397,6 +401,11 @@ if runVar.logP/opts.T <= -log(opts.Pmin)
         rjtCount = rjtCount + 1;
 	end
 	pt_n = find(isnan(logPLocal),1,'first');
+	if isempty(pt_n) %Increase size of storage matrices is necessary
+		ptLocal     = [ptLocal;zeros(ptNoMax*10,varNo)];
+		ptUniqLocal = [ptUniqLocal;false(ptNoMax*10,1)]; 
+		logPLocal   = [logPLocal;nan(ptNoMax*10,1)];
+	end
 	ptUniqLocal(pt_n) = ptUniq;
 	logPLocal(pt_n)   = runVar.logP;
 	ptLocal(pt_n,:)   = runVar.pt;
@@ -405,7 +414,7 @@ if runVar.logP/opts.T <= -log(opts.Pmin)
 else
 	rjtCount = rjtCount + 1;
 end
-printCheckpoint('5',outputName,opts.disp);
+printCheckpoint('5',runVar.outputName,opts.disp);
     
 %       -----------------------------
 % ----- Primary worker progress check ------
@@ -423,7 +432,7 @@ if (sum(ptUniqLocal) >= nprogress*opts.ptNo/opts.dispInt) && labindx == 1
 		end
 	end
 end
-printCheckpoint('6',outputName,opts.disp);
+printCheckpoint('6',runVar.outputName,opts.disp);
 
 %       ------------------------------
 % ----- Stall check (lack of progress) ------
@@ -441,7 +450,7 @@ if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10) && status~=0
 		end
 	end 
 end
-printCheckpoint('7',outputName,opts.disp);
+printCheckpoint('7',runVar.outputName,opts.disp);
 
 %       ----------------------------------
 % ----- Secondary worker exit signal check ------
@@ -453,7 +462,7 @@ if opts.parMode && labindx ~= 1
 		status = labReceive(1,2);
 	end
 end
-printCheckpoint('8',outputName,opts.disp);
+printCheckpoint('8',runVar.outputName,opts.disp);
 
 %       -----------------------------------------------
 % ----- Send data from secondary work to primary worker ------
@@ -487,11 +496,11 @@ elseif (labindx > 1 && nansum(ptUniqLocal) == ptNoMax) && status == 1
 	tNow = clock;
 	fprintf_cust(outFileHandle,'Data packet sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 end
-printCheckpoint('9',outputName,opts.disp)
+printCheckpoint('9',runVar.outputName,opts.disp)
 
 end
 %% Run completion
-printCheckpoint('10',outputName,opts.disp)
+printCheckpoint('10',runVar.outputName,opts.disp)
 
 %       -----------------------------------------------------
 % ----- Cycle through each secondary worker and look for data ------
@@ -536,7 +545,7 @@ elseif opts.parMode
 	labSend(11,1); %Send successful exit message back to lab 1.
 end
 
-printCheckpoint('11',outputName,opts.disp)
+printCheckpoint('11',runVar.outputName,opts.disp)
     
 fprintf_cust(outFileHandle,'--------------------------------\n');
 fprintf_cust(outFileHandle,'------------Run Ended-----------\n');
@@ -567,22 +576,23 @@ function [runVar,opts] = MCMCEvolve(runVar,opts)
 pt0   = runVar.pt;
 logP0 = runVar.logP;
 
+printCheckpoint('2.1.1',runVar.outputName,opts.disp);
 % Generate next point
 [pt1,pdfBias] = opts.propDis(runVar);
-
+printCheckpoint('2.1.2',runVar.outputName,opts.disp);
 %Check point still in boundary
 if ~isempty(runVar.bnd)
 	if sum(pt1 < runVar.bnd(:,1)) || sum(pt1 > runVar.bnd(:,2))
 		error('MCMC:boundaryBreached','The program ran outside the boundary. Likely to be a bug in the proposal distribution')
 	end
 end
-
+printCheckpoint('2.1.3',runVar.outputName,opts.disp);
 % Obtain likelihood of proposed step
 logP1 = runVar.obj(pt1);      
 if isnan(logP1)
 	logP1 = Inf;
 end
-
+printCheckpoint('2.1.4',runVar.outputName,opts.disp);
 % Metropolis Algorithm andABC Rejection when less than threshold 
 test = min([1 exp((logP0-logP1)/opts.T)/... % Calculate hastings term to make metropolic, set
 	                    pdfBias]);          % pdfbias to one in your proposal distribution function
@@ -593,7 +603,7 @@ runVar.ptTest(1) = [];
 % if logP1 < absthres
 % 	runVar.ptTest = true;
 % end
-
+printCheckpoint('2.1.5',runVar.outputName,opts.disp);
 % Replace current point
 if runVar.ptTest(end)
 	runVar.pt = pt1;
