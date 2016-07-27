@@ -311,7 +311,7 @@ stepCount = stepCount + 1;
 
 if mod(floor(toc(t1))/60,10) == 0 && strcmpi(opts.disp,'text')
 	tNow = clock;
-	fprintf_cust(outFileHandle,'Time elapsed - %1.0f | Real time - %2.0f:%2.0f:%2.0f \n',floor(toc(t1)/60),tNow(4:6));
+	fprintf_cust(runVar.outFileHandle,'Time elapsed - %1.0f | Real time - %2.0f:%2.0f:%2.0f \n',floor(toc(t1)/60),tNow(4:6));
 end
 printCheckpoint('3',runVar.outputName,opts.disp);
 
@@ -405,6 +405,7 @@ if runVar.logP/opts.T <= -log(opts.Pmin)
 		ptLocal     = [ptLocal;zeros(ptNoMax*10,varNo)];
 		ptUniqLocal = [ptUniqLocal;false(ptNoMax*10,1)]; 
 		logPLocal   = [logPLocal;nan(ptNoMax*10,1)];
+		pt_n = find(isnan(logPLocal),1,'first');
 	end
 	ptUniqLocal(pt_n) = ptUniq;
 	logPLocal(pt_n)   = runVar.logP;
@@ -422,13 +423,13 @@ printCheckpoint('5',runVar.outputName,opts.disp);
 if (sum(ptUniqLocal) >= nprogress*opts.ptNo/opts.dispInt) && labindx == 1
 	nprogress = nprogress + 1;
 	tNow = clock;
-	fprintf_cust(outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n',(sum(ptUniqLocal)/ptNoMax*100),toc(t1),tNow(4:6));
+	fprintf_cust(runVar.outFileHandle,'%3.0f%% done after %7.1f seconds. | (%2.0f:%2.0f:%2.0f) \n',(sum(ptUniqLocal)/ptNoMax*100),toc(t1),tNow(4:6));
     if sum(ptUniqLocal)/ptNoMax >= 1
-		fprintf_cust(outFileHandle,'Current block complete. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		fprintf_cust(runVar.outFileHandle,'Current block complete. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		status = 0;
 		if opts.parMode
 			labSend(status,2:numlab,2) %Send stop signal
-			fprintf_cust(outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+			fprintf_cust(runVar.outFileHandle,'Exit signal sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		end
 	end
 end
@@ -440,13 +441,13 @@ printCheckpoint('6',runVar.outputName,opts.disp);
 if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10) && status~=0
 	stallWarn = stallWarn + 1;
 	tNow = clock;
-	fprintf_cust(outFileHandle,'Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)  | (%2.0f:%2.0f:%2.0f) \n',stallWarn,toc(t1),toc(t2),tNow(4:6));
+	fprintf_cust(runVar.outFileHandle,'Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)  | (%2.0f:%2.0f:%2.0f) \n',stallWarn,toc(t1),toc(t2),tNow(4:6));
 	if toc(t2)>opts.walltime*60
-		fprintf_cust(outFileHandle,'Lab stop triggered due to taking too long... | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		fprintf_cust(runVar.outFileHandle,'Lab stop triggered due to taking too long... | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		status = -1;
 		if opts.parMode
 			labSend(status,2:numlab,2) %Send stop signal
-			fprintf_cust(outFileHandle,'Exit signal sent. Quitting.\n | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+			fprintf_cust(runVar.outFileHandle,'Exit signal sent. Quitting.\n | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		end
 	end 
 end
@@ -458,7 +459,7 @@ printCheckpoint('7',runVar.outputName,opts.disp);
 if opts.parMode && labindx ~= 1
 	if labProbe(1,2)
 		tNow = clock;
-		fprintf_cust(outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+		fprintf_cust(runVar.outFileHandle,'Exit signal received. Quitting. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		status = labReceive(1,2);
 	end
 end
@@ -483,7 +484,7 @@ if labindx == 1 && opts.parMode && status == 1
 			logPLocal((pt_n+1):(pt_n+pt_n_New)) = logPNew(1:pt_n_New,:);
 			if ~strcmpi(opts.disp,'off')
 				tNow = clock;
-				fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
+				fprintf_cust(runVar.outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
             end
 		end
 	end
@@ -494,7 +495,7 @@ elseif (labindx > 1 && nansum(ptUniqLocal) == ptNoMax) && status == 1
 	logPLocal = nan(size(logPLocal));
 	ptLocal = zeros(size(ptLocal));
 	tNow = clock;
-	fprintf_cust(outFileHandle,'Data packet sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+	fprintf_cust(runVar.outFileHandle,'Data packet sent. | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 end
 printCheckpoint('9',runVar.outputName,opts.disp)
 
@@ -506,7 +507,7 @@ printCheckpoint('10',runVar.outputName,opts.disp)
 % ----- Cycle through each secondary worker and look for data ------
 %       -----------------------------------------------------
 
-fprintf_cust(outFileHandle,'Cycling through slave-labs to complete outstanding data transfers.\n')
+fprintf_cust(runVar.outFileHandle,'Cycling through slave-labs to complete outstanding data transfers.\n')
 t3 = tic; %end timer
 if labindx == 1 && opts.parMode
 	otherLabStat(1) = 11; %Set successful exit for lab 1
@@ -526,18 +527,18 @@ if labindx == 1 && opts.parMode
 				logPLocal((pt_n+1):(pt_n+pt_n_New)) = logPNew(1:pt_n_New,:);
 				if ~strcmpi(opts.disp,'off')
 					tNow = clock;
-					fprintf_cust(outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
+					fprintf_cust(runVar.outFileHandle,'Data packet received (pt_n = %d) from slave %d. | (%2.0f:%2.0f:%2.0f) \n',nansum(ptUniqNew),srcIndx,tNow(4:6));
 				end
 			end
 		end
 		pause(1)
 		if toc(t3)> 600
-			fprintf_cust(outFileHandle,'Waiting too long, quiting...\n');
+			fprintf_cust(runVar.outFileHandle,'Waiting too long, quiting...\n');
 			break
 		elseif mod(toc(t3),30)>0 && mod(toc(t3),30) <1
-			fprintf_cust(outFileHandle,'Still waiting on labs...');
-			fprintf_cust(outFileHandle,':%d',find(otherLabStat~=11));
-			fprintf_cust(outFileHandle,'\n');
+			fprintf_cust(runVar.outFileHandle,'Still waiting on labs...');
+			fprintf_cust(runVar.outFileHandle,':%d',find(otherLabStat~=11));
+			fprintf_cust(runVar.outFileHandle,'\n');
 			labSend(status,2:numlab,2)
 		end
 	end
@@ -547,12 +548,12 @@ end
 
 printCheckpoint('11',runVar.outputName,opts.disp)
     
-fprintf_cust(outFileHandle,'--------------------------------\n');
-fprintf_cust(outFileHandle,'------------Run Ended-----------\n');
-fprintf_cust(outFileHandle,'--------------------------------\n\n\n');
+fprintf_cust(runVar.outFileHandle,'--------------------------------\n');
+fprintf_cust(runVar.outFileHandle,'------------Run Ended-----------\n');
+fprintf_cust(runVar.outFileHandle,'--------------------------------\n\n\n');
 
-if ~isempty(outFileHandle) && outFileHandle~=1
-    fclose(outFileHandle);
+if ~isempty(runVar.outFileHandle) && runVar.outFileHandle~=1
+    fclose(runVar.outFileHandle);
 end
 
 if ~opts.parMode
