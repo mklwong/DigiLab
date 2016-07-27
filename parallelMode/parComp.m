@@ -40,7 +40,7 @@ switch lower(deblank(mode))
                     fprintf('Cluster already open\n')
                 end
                 varargout{1} = 0;
-	    else
+			else
                 clustInfo = findResource;
                 maxWorkers = clustInfo.ClusterSize;
                 numWorkers = min([maxWorkers numWorkers]); %Make sure required workers is not more than max workers

@@ -302,11 +302,7 @@ end
 %      --------------------
 % ----- Evolve Active Point ------
 %      --------------------
-printCheckpoint('2.1',runVar.outputName,opts.disp);
 [runVar,opts] = MCMCEvolve(runVar,opts);
-printCheckpoint('2.2',runVar.outputName,opts.disp);
-runVar = opts.adaptFun(runVar,opts);
-printCheckpoint('2.3',runVar.outputName,opts.disp);
 stepCount = stepCount + 1;
 
 if mod(floor(toc(t1))/60,10) == 0 && strcmpi(opts.disp,'text')
@@ -614,6 +610,8 @@ else
 	runVar.logP = logP0;
 end
 runVar.delPt = pt1-pt0;
+
+runVar = opts.adaptFun(runVar,opts);
 
 end
 
