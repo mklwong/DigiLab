@@ -434,12 +434,12 @@ printCheckpoint('6',runVar.outputName,opts.disp);
 %       ------------------------------
 % ----- Stall check (lack of progress) ------
 %       ------------------------------
-if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10) && status~=0
+if labindx == 1 && toc(t2)>((stallWarn+1)*opts.stalltime*60/10) && status~=0
 	stallWarn = stallWarn + 1;
 	tNow = clock;
 	fprintf_cust(runVar.outFileHandle,'Program still running, but stuck in low probability area (%2.2f). (Last:%7.1fs|Tot:%7.1fs)  | (%2.0f:%2.0f:%2.0f) \n',stallWarn,toc(t1),toc(t2),tNow(4:6));
-	if toc(t2)>opts.walltime*60
-		fprintf_cust(runVar.outFileHandle,'Lab stop triggered due to taking too long... | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+	if toc(t2)>opts.stalltime*60
+		fprintf_cust(runVar.outFileHandle,'Lab stop triggered due to taking too long (Stalltime)... | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
 		status = -1;
 		if opts.parMode
 			labSend(status,2:numlab,2) %Send stop signal
@@ -447,6 +447,18 @@ if labindx == 1 && toc(t2)>((stallWarn+1)*opts.walltime*60/10) && status~=0
 		end
 	end 
 end
+
+%       ------------------------------
+% ----- Walltime check (lack of progress) ------
+%       ------------------------------
+if toc(t2)>opts.walltime*60
+    fprintf_cust(runVar.outFileHandle,'Lab stop triggered due to taking too long (Walltime)... | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+    status = -2;
+    if opts.parMode
+        labSend(status,2:numlab,2) %Send stop signal
+        fprintf_cust(runVar.outFileHandle,'Exit signal sent. Quitting.\n | (%2.0f:%2.0f:%2.0f) \n',tNow(4:6));
+    end
+end 
 printCheckpoint('7',runVar.outputName,opts.disp);
 
 %       ----------------------------------

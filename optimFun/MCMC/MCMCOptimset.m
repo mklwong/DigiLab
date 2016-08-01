@@ -51,6 +51,8 @@ Names = ['PtNo       ' %number of points to store    | defaults at 10,000
 		 'maxStep    ' %Maximum step size            | defaults at 1
 		 'dir        ' %String for output location   | defaults at blank
 		 'seed       ' %Initialisation seed          | defaults empty
+         'Stalltime  ' %max time between stored      | defaults to 5
+                       %points in mins         
 		 ];         
      
 %===============================%
@@ -68,7 +70,8 @@ opts.rjtRto    = 0.5;
 opts.disp      = 'Terminal';
 opts.dispInt   = 10;
 opts.walltime  = 60;
-opts.stepi      = 0.25;
+opts.stalltime = 5;
+opts.stepi     = 0.25;
 opts.propDis   = @(runVar) propDis(runVar);
 opts.parMode   = true;
 opts.passNo    = 500;
@@ -125,6 +128,8 @@ for ii = 1:length(varargin)
 				opts.dir = varargin{ii+1};
 			case lower(deblank(Names(17,:)))   %seed
 				opts.seed = varargin{ii+1};
+            case lower(deblank(Names(18,:)))    %wall time
+				opts.stalltime = varargin{ii+1};
             otherwise
 				warning('MCMCoptimset:unknowninput',['Input options ' num2str(ii) ' is non-existent. Check spelling.'])
 					
