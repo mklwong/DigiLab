@@ -345,6 +345,10 @@ case 'dyneqn'
 %Required inputs are [t,x,model]
 %Required outputs are [dx_dt]
 
+% Use the sparse function where possible to collapse multiple duplicate
+% index terms with summation. This is much quicker than any possible
+% manual implementation
+
 [t,x,model] = varargin{:};
 
 % ~~Timer constrain~~
