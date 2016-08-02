@@ -16,9 +16,13 @@
 % element of the vector is negative is it indicates an unknown parameter
 % that is part of a group.
 
+%% Concentration Setting
+%
+spcMode = 'a'; %a for amount and c for concentration
+
 %% Compartment definition
 %
-% spcComp = {'Compartment name', relative size};
+% modComp = {'Compartment name', relative size};
 %
 modComp = {'Cyto', 1;
            'PM'  , 0.05;

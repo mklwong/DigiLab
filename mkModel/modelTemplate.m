@@ -18,9 +18,27 @@
 % grp is a positive integer. All parameters with grp that is the same
 % integer are in the same group.
 
+%% Concentration Setting
+%
+% spcMode = 'a';
+%
+% ~~~Guide~~~
+% "species mode" is a switch that determines how quantification in the
+% model are handled. It can either be 'a' or 'c' for 'absolute' or
+% 'concentration'. For 'absolute', all quantifications are considered in
+% amounts, that is molarity (for instance). For 'concentration', all
+% quantifications are considered in concentration, that is molar value (for
+% instance).
+% 
+% The impact on this is in whether the quantification is divided by the
+% compartment size or not (is divided if absolute, is not otherwise).
+
+spcMode = 'a'; 
+
+
 %% Compartment definition
 %
-% spcComp = {'Compartment name', relative size};
+% modComp = {'Compartment name', relative size};
 %
 % ~~~Guide~~~
 % "Compartment name" is the name of the compartment in the system
