@@ -11,14 +11,15 @@ guide](https://help.github.com/articles/fork-a-repo/) ), and then adding the
 path of your local fork to the MATLAB search path. The functions within the
 package should then work.
 
-The basic usages steps are:
+The basic usage steps are:
 
 1. `mkModel(filename)` - this creates a barebones sigMat model to build from.
 2. `[t,Y] = findTC(modelName,t)` - this simulates the model name.
-3. `[pts,logP] = MCMC(objFun,pt0,bnd)` - this performs parameter fitting on the objective function objFun.
+3. `[pts,logP] = MCMC(objFun,pt0,bnd)` - this performs parameter fitting on 
+                                         the objective function objFun.
 
 Type `>> help [function]` for more information about usage of these functions.
-Alternately, you can find the documentation for this package in document.pdf
+Alternately, you can find the documentation for this package in documentation.pdf
 
 Licensing
 =========
