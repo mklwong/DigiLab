@@ -12,10 +12,10 @@ path of your local fork to the MATLAB search path. The functions within the
 package should then work.
 
 The basic usages steps are:
-1) mkModel(filename) - this creates a barebones sigMat model to build from.
-2) [t,Y] = findTC(modelName,t) - this simulates the model name.
-3) [pts,logP] = MCMC(objFun,pt0,bnd) - this performs parameter fitting on
-                                       the objective function objFun.
+1) mkModel(filename) - this creates a barebones sigMat model to build from. \\
+2) [t,Y] = findTC(modelName,t) - this simulates the model name.\\
+3) [pts,logP] = MCMC(objFun,pt0,bnd) - this performs parameter fitting on\\
+                                       the objective function objFun.\\
 
 Type >> help [function] for more information about usage of these functions.
 Alternately, you can find the documentation for this package in document.pdf
@@ -31,10 +31,8 @@ of Martin Wong, Sydney University, 2016.
 
 
 This program is free software: you can redistribute it and/or modify 
-
-it under the terms of the GNU General Public License as published 
-
-by the Free Software Foundation, either version 3 of the License, or 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
 
 (at our option) any later version.
 
