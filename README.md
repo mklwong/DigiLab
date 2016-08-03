@@ -12,6 +12,7 @@ path of your local fork to the MATLAB search path. The functions within the
 package should then work.
 
 The basic usages steps are:
+
 1. mkModel(filename) - this creates a barebones sigMat model to build from.
 2. [t,Y] = findTC(modelName,t) - this simulates the model name.
 3. [pts,logP] = MCMC(objFun,pt0,bnd) - this performs parameter fitting on
