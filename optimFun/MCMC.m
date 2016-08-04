@@ -225,14 +225,13 @@ elseif ~isempty(runVar.priorP)
 	rngPt = rand(1);
 	newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
     runVar.pt    = opts.prior.pts(newPtInd,:)';
-	runVar.logP  = runVar.obj(runVar.pt);
 elseif isempty(runVar.bnd)
 	error('mcmc:unboundNoPrior','MCMC cannot be run with no boundary when no prior is given')
 else
 	varNo = size(runVar.bnd,1);
 	runVar.pt   = seedPt(runVar);
-    runVar.logP = runVar.obj(runVar.pt);
 end
+runVar.logP = runVar.obj(runVar.pt);
 
 % Initialise run functions and parameters
 runVar = opts.adaptFun(runVar,opts);
@@ -266,7 +265,7 @@ if opts.parMode
 end
 
 status = 1; % Enter MCMC loop
-runVar.logP = Inf;  %Set this to enter the point selection loop
+
 %%
 while status == 1
 	
