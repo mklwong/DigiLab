@@ -1,5 +1,6 @@
-%% Synthesis
+%% Hill Function
 
+rxnRules = @odeKinetic;
 spcMode = 'a';
 
 %% Compartment definition

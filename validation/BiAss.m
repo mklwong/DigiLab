@@ -1,5 +1,6 @@
-%% Synthesis
+%% Bimolecular Association (complex formation)
 
+rxnRules = @odeKinetic;
 spcMode = 'a';
 
 %% Compartment definition

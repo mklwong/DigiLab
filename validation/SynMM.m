@@ -1,5 +1,6 @@
-%% Synthesis
+%% Synthesis Enzyme Kinetic
 
+rxnRules = @odeKinetic;
 spcMode = 'a';
 
 %% Compartment definition

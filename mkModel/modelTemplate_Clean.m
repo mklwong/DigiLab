@@ -16,6 +16,10 @@
 % element of the vector is negative is it indicates an unknown parameter
 % that is part of a group.
 
+%% Rule Set
+%
+rxnRule = @odeKinetic;
+
 %% Concentration Setting
 %
 spcMode = 'a'; %a for amount and c for concentration

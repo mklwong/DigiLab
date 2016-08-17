@@ -1,5 +1,6 @@
-%% Synthesis
+%% Enzyme Mediated Degradation with Mass Action
 
+rxnRules = @odeKinetic;
 spcMode = 'a';
 
 %% Compartment definition

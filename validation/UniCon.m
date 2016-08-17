@@ -1,5 +1,6 @@
-%% Synthesis
+%% Unimolecular transition
 
+rxnRules = @odeKinetic;
 spcMode = 'a';
 
 %% Compartment definition

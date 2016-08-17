@@ -18,6 +18,18 @@
 % grp is a positive integer. All parameters with grp that is the same
 % integer are in the same group.
 
+%% Rule Set
+%
+% rxnRules = @odeKinetic
+%
+% ~~Guide~~
+% "reaction rules" defines the function which contains the reaction rules
+% which this model will be constructed with. The default rule set that
+% comes with SigMat is odeKinetic. However, custom rule sets can be made.
+% Simply change @odeKinetic with your custom function.
+
+rxnRules = @odeKinetic;
+
 %% Concentration Setting
 %
 % spcMode = 'a';
