@@ -22,7 +22,7 @@ rxnRule = @odeKinetic;
 
 %% Concentration Setting
 %
-spcMode = 'a'; %a for amount and c for concentration
+spcMode = 'c'; %a for amount and c for concentration
 
 %% Compartment definition
 %
@@ -37,8 +37,8 @@ modComp = {'Cyto', 1;
 %
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
-modSpc = {'AKT'     ,'Cyto', 0;
-          'mAKT'    ,'PM'  , NaN;
+modSpc = {'mAKT'    ,'PM'  , 1;
+          'AKT'     ,'Cyto', 0;
           'p473mAKT','PM'  , 0;
           'p473AKT' ,'Cyto', 0;
           'mTORC2'  ,'PM'  , 1};
@@ -72,7 +72,7 @@ rxn(end+1).desc = 'mAKT -> p473mAKT | mTORC2';
     rxn(end).sub = 'mAKT';  
     rxn(end).prod= 'p473mAKT'; 
     rxn(end).enz = 'mTORC2';
-	rxn(end).Km  = NaN; 
+	rxn(end).Km  = 1; 
     rxn(end).k   = 0.1; 
-	rxn(end).r   = [NaN 1 0.1 1]; 
-	rxn(end).n   = [3 1]; 
+	rxn(end).r   = 1; 
+	rxn(end).n   = 1; 
