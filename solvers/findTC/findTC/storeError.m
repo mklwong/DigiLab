@@ -31,6 +31,12 @@ if ~exist(dirLoc,'dir')
     mkdir(dirLoc);
 end
 
+if exist('labindex');
+	labVal = labindex;
+else
+	labVal = 1;
+end
+
 %% Generate error identity code
 errorID = floor(rand(1)*1000000);
 errorID = ['e' num2str(errorID)];
@@ -68,8 +74,8 @@ t = clock();
 % fclose(h);
 
 %% Save state into error file
-if exist([dirLoc '/errors.mat'],'file')
-    load([dirLoc '/errors.mat']);
+if exist([dirLoc '/errors-lab-' labVal '.mat'],'file')
+    load([dirLoc '/errors-lab-' labVal '.mat']);
 else
 	errs = struct([]);
 end
@@ -85,4 +91,4 @@ errs(nerrs).errID = errorID;
 errs(nerrs).msg   = matmsg;
 errs(nerrs).time  = [num2str(t(3),'%2.0f') '-' num2str(t(2),'%2.0f') '-' num2str(t(1),'%4.0f') ', ' num2str(t(4),'%2.0f') ':' num2str(t(5),'%2.0f')];
 
-save([dirLoc '/errors.mat'],'errs')
+save([dirLoc '/errors-lab-' labVal '.mat'],'errs')
