@@ -74,8 +74,8 @@ t = clock();
 % fclose(h);
 
 %% Save state into error file
-if exist([dirLoc '/errors-lab-' labVal '.mat'],'file')
-    load([dirLoc '/errors-lab-' labVal '.mat']);
+if exist([dirLoc '/errors-lab-' num2str(labVal) '.mat'],'file')
+    load([dirLoc '/errors-lab-' num2str(labVal) '.mat']);
 else
 	errs = struct([]);
 end
@@ -91,4 +91,4 @@ errs(nerrs).errID = errorID;
 errs(nerrs).msg   = matmsg;
 errs(nerrs).time  = [num2str(t(3),'%2.0f') '-' num2str(t(2),'%2.0f') '-' num2str(t(1),'%4.0f') ', ' num2str(t(4),'%2.0f') ':' num2str(t(5),'%2.0f')];
 
-save([dirLoc '/errors-lab-' labVal '.mat'],'errs')
+save([dirLoc '/errors-lab-' num2str(labVal) '.mat'],'errs')
