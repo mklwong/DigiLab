@@ -35,7 +35,7 @@ modComp = {'Cyto', 1;
 
 %% Model species definition
 %
-% modSpc ={'State name', 'Compatment'  , conc/param};
+% modSpc ={'State name', 'Compartment'  , conc/param};
 
 modSpc = {'mAKT'    ,'PM'  , 1;
           'AKT'     ,'Cyto', 2;

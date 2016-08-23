@@ -75,7 +75,7 @@ modComp = {'Cyto', 1;
 
 %% Model species definition
 %
-% modSpc ={'State name', 'Compatment'  , conc/amount};
+% modSpc ={'State name', 'Compartment'  , conc/amount};
 %
 % ~~~Guide~~~
 % "State" is the name of the state to be included in the simulation
