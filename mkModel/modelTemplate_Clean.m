@@ -38,10 +38,10 @@ modComp = {'Cyto', 1;
 % modSpc ={'State name', 'Compatment'  , conc/param};
 
 modSpc = {'mAKT'    ,'PM'  , 1;
-          'AKT'     ,'Cyto', 0;
-          'p473mAKT','PM'  , 0;
-          'p473AKT' ,'Cyto', 0;
-          'mTORC2'  ,'PM'  , 1};
+          'AKT'     ,'Cyto', 2;
+          'p473mAKT','PM'  , 3;
+          'p473AKT' ,'Cyto', 4;
+          'mTORC2'  ,'PM'  , 5};
 
 %% Features of default parameters
 % Bnd.(param) = [lb ub]
@@ -76,3 +76,10 @@ rxn(end+1).desc = 'mAKT -> p473mAKT | mTORC2';
     rxn(end).k   = 0.1; 
 	rxn(end).r   = 1; 
 	rxn(end).n   = 1; 
+
+rxn(end+1).desc = 'p473mAKT -> mAKT2';
+    rxn(end).sub = 'p473mAKT';  
+    rxn(end).prod= 'mAKT'; 
+    rxn(end).k   = 0; 
+	rxn(end).r   = 1; 
+	rxn(end).n   = 1; 	
