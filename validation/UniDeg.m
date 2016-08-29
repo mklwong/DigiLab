@@ -1,4 +1,5 @@
-%% Synthesis
+%% Unimolecular Degradation
+rxnRules = @odeKinetic;
 
 %% Compartment definition
 %

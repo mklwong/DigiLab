@@ -5,51 +5,84 @@
 % '%%'.
 
 %% Forward: Parameters
-% A common feature in these model files is the idea of a "parameter". Any
-% variable that is a parameter is defined using six potential formats:
+% A common feature in these model files is the idea of a "parameter".
+% Anything can be a parameter: concentrations, compartment size, reaction
+% rates and Michaelis constants to name a few.
+%
+% Any variable that is a parameter is defined using six potential formats:
 %	1) [val]           : Known and fixed parameter
 %	2) [NaN]           : Unknown parameter, default range used
 %	3) [NaN lb ub]     : Unknown parameter, custom range
-%   5) [grp*i]         : Unknown parameter with other parameters with the same
+%   5) [NaN grp]       : Unknown parameter with other parameters with the same
 %                        value, custom range. Note the "i" is iota, i.e. imaginary.
-%   6) [factor + grp*i]: Unknown parameter that is a multiplicative factor of
+%   6) [factor + grp]: Unknown parameter that is a multiplicative factor of
 %                        another parameter. Parameter of this format is
 %                        dependent. Note the "i" is iota, i.e. imaginary.
 % grp is a positive integer. All parameters with grp that is the same
 % integer are in the same group.
 
+%% Rule Set
+%
+% rxnRules = @odeKinetic
+%
+% ~~Guide~~
+% "reaction rules" defines the function which contains the reaction rules
+% which this model will be constructed with. The default rule set that
+% comes with SigMat is odeKinetic. However, custom rule sets can be made.
+% Simply change @odeKinetic with your custom function.
+
+rxnRules = @odeKinetic;
+
+%% Concentration Setting
+%
+% spcMode = 'a';
+%
+% ~~~Guide~~~
+% "species mode" is a switch that determines how quantification in the
+% model are handled. It can either be 'a' or 'c' for 'absolute' or
+% 'concentration'. For 'absolute', all quantifications are considered in
+% amounts, that is molarity (for instance). For 'concentration', all
+% quantifications are considered in concentration, that is molar value (for
+% instance).
+% 
+% The impact on this is in whether the quantification is divided by the
+% compartment size or not (is divided if absolute, is not otherwise).
+
+spcMode = 'c'; 
+
+
 %% Compartment definition
 %
-% spcComp = {'Compartment name', relative size};
+% modComp = {'Compartment name', relative size};
 %
 % ~~~Guide~~~
 % "Compartment name" is the name of the compartment in the system
 %
 % Relative size is the relative size of the compartment. Can be infinite
 % (in which case the concentration of species in that compartment is
-% fixed).
+% fixed). This is a parameter.
 %
 % ~~~Example~~~
 % We are modelling the a cell with only a cytoplasm (cyto) and plasma
-% membrane (PM). The extracellular space (ES) is considered far larger than 
+% membrane (PM). The extracellular matrix (ECM) is considered far larger than 
 % either compartments which we consider infinite in size. This would give 
 % the following.
 %
 modComp = {'Cyto', 1;
            'PM'  , 0.05;
-           'ES'  , Inf;
+           'ECM' , Inf;
            };
 
 %% Model species definition
 %
-% modSpc ={'State name', 'Compatment'  , conc/param};
+% modSpc ={'State name', 'Compartment'  , conc/amount};
 %
 % ~~~Guide~~~
 % "State" is the name of the state to be included in the simulation
 %
 % Compartment name of the compartment as defined in the compartment part.
 %
-% Conc/param is either the concentration of the state. This is a parameter.
+% Conc/amount is either the concentration or amount of the state. This is a parameter.
 %
 % ~~~Example~~~
 % We are modelling the protein AKT. It can either be cytosolic or plasma
@@ -58,11 +91,11 @@ modComp = {'Cyto', 1;
 % mTORC2 is also included to phosphorylation AKT.
 % We would define this by:
 %
-modSpc = {'AKT'     ,'Cyto', 0;
-          'mAKT'    ,'PM'  , NaN;
-          'p473mAKT','PM'  , 0;
-          'p473AKT' ,'Cyto', 0;
-          'mTORC2'  ,'PM'  , 1};
+modSpc = {'mAKT'    ,'PM'  , 1;
+          'AKT'     ,'Cyto', 2;
+          'p473mAKT','PM'  , 3;
+          'p473AKT' ,'Cyto', 4;
+          'mTORC2'  ,'PM'  , 5};
 
 %% Features of default parameters
 %
@@ -104,8 +137,8 @@ Bnd.Comp = [0 1];
 %   - Prod     : List of products written as a cell array.
 %   - Enz      : Mediating enzyme
 %   - Km       : Michaelis Constant for enzymatic reaction. Is a parameter.
-%   - r        : Geometry factor
-%   - n        : Hill coefficient
+%   - r        : Geometry factor. Is a parameter.
+%   - n        : Hill coefficient. Is a parameter.
 %   
 % Begin a new reaction by placing (end+1) after rxn. Continue a reaction by
 % placing (end) after rxn [The reason for this is due to programming. Just
@@ -126,10 +159,17 @@ rxn(end+1).desc = 'mAKT -> p473mAKT | mTORC2';
     rxn(end).sub = 'mAKT';  
     rxn(end).prod= 'p473mAKT'; 
     rxn(end).enz = 'mTORC2';
-	rxn(end).Km  = NaN; 
+	rxn(end).Km  = 1; 
     rxn(end).k   = 0.1; 
-	rxn(end).r   = [NaN 1 0.1 1]; 
-	rxn(end).n   = [3 1]; 
+	rxn(end).r   = 1; 
+	rxn(end).n   = 1; 
+
+rxn(end+1).desc = 'p473mAKT -> mAKT2';
+    rxn(end).sub = 'p473mAKT';  
+    rxn(end).prod= 'mAKT'; 
+    rxn(end).k   = 0; 
+	rxn(end).r   = 1; 
+	rxn(end).n   = 1; 	
 
  % More information on types of reactions:
  % If the fields (excluding label and k) are:

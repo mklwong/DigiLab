@@ -1,4 +1,4 @@
-function model = parseModelm(model,rxnRules,flags)
+function model = parseModelm(model,flags)
 
 %   out = parseModelm(model,debug)
 %
@@ -127,10 +127,11 @@ for ii = 1:length(modelname)
 	%	- rxn:	   list of reactions of the model
 	
 	if ii == 1
-		modComp_all = modComp;
-		modSpc_all  = modSpc;
-		Bnd_all     = Bnd;
-		rxn_all     = rxn;
+		modComp_all  = modComp;
+		modSpc_all   = modSpc;
+		Bnd_all      = Bnd;
+		rxn_all      = rxn;
+		rxnRules_all = rxnRules;
 	else
 		% Check for conflicts between models in compartments
 		[jj,kk] = ismember(modComp(:,1),modComp_all(:,1));
@@ -198,7 +199,11 @@ for ii = 1:length(modelname)
 		
 		% Merge reaction list
 		rxn_all = [rxn_all rxn];
-
+		
+		% Check for conflicting reaction rules
+		if rxnRules_all ~= rxnRules;
+			error(['Models to be combined are based on different rulesets. This is not allowed. Merged models must be based on the same ruleset. Please correct this before trying again.'])
+		end
 	end
 end
 modComp = modComp_all;
@@ -206,6 +211,7 @@ modSpc  = modSpc_all;
 Bnd     = Bnd_all;
 rxn     = rxn_all;
 model.name = model.name(1:end-1);
+rxnRules   = rxnRules_all;
 
 %Load Model Rules
 if ~exist('rateLaw','var')

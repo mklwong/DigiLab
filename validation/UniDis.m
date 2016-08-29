@@ -1,4 +1,5 @@
-%% Synthesis
+%% Unimolecular Dissociation
+rxnRules = @odeKinetic;
 
 %% Compartment definition
 %

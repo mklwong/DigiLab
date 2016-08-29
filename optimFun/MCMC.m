@@ -84,6 +84,8 @@ if ~isempty(opts.prior.pts)
     opts.prior.pts = priorPts;
     opts.prior.logP = priorLogP;
 	clear dupIndx rmPts priorLogP priorPts priorP prior rmIndx prir_n
+else
+	runVar.priorP = [];
 end
 
 %% Check for and open parallel computing
@@ -218,19 +220,18 @@ fprintf_cust(runVar.outFileHandle,'Run Begins at %2.0f:%2.0f:%2.0f (%2.0f-%2.0f-
 if ~isempty(runVar.pt)
 	varNo = length(runVar.pt);
 	opts.resample = Inf; %no resampling when picking one start point
-elseif isfield(runVar,'priorP')
+elseif ~isempty(runVar.priorP)
 	varNo = size(opts.prior.pts(1,:),2);
 	rngPt = rand(1);
 	newPtInd = ceil(interp1([0;runVar.priorP],0:length(runVar.priorP),rngPt));
     runVar.pt    = opts.prior.pts(newPtInd,:)';
-	runVar.logP  = runVar.obj(runVar.pt);
 elseif isempty(runVar.bnd)
 	error('mcmc:unboundNoPrior','MCMC cannot be run with no boundary when no prior is given')
 else
 	varNo = size(runVar.bnd,1);
 	runVar.pt   = seedPt(runVar);
-    runVar.logP = runVar.obj(runVar.pt);
 end
+runVar.logP = runVar.obj(runVar.pt);
 
 % Initialise run functions and parameters
 runVar = opts.adaptFun(runVar,opts);
@@ -264,7 +265,7 @@ if opts.parMode
 end
 
 status = 1; % Enter MCMC loop
-runVar.logP = Inf;  %Set this to enter the point selection loop
+
 %%
 while status == 1
 	

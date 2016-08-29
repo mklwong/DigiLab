@@ -1,5 +1,6 @@
-%% Synthesis
+%% Mass Action Approximated Enzyme Reaction
 
+rxnRules = @odeKinetic;
 spcMode = 'a';
 
 %% Compartment definition

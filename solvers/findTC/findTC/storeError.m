@@ -19,67 +19,65 @@ if isfield(model,'name')
 	dirLoc = which(modName);
 	dirLoc(end-1:end) = [];
 elseif ischar(model)
-	modName = model;
 	dirLoc = ['./' model];
 else
-	modName = 'custom';
 	dirLoc = './custom';
 end
 end
-dirLoc = [dirLoc '-Errors'];
+dirLoc = [dirLoc '/Errors'];
 
 %% Check if directory for storage exists
-
 if ~exist(dirLoc,'dir')
     mkdir(dirLoc);
 end
 
-if ~exist('labindex','builtin')
-	labindx = 1;
+if exist('labindex');
+	labVal = labindex;
 else
-	labindx = labindex;
+	labVal = 1;
 end
 
 %% Generate error identity code
 errorID = floor(rand(1)*1000000);
 errorID = ['e' num2str(errorID)];
 
-%% Print the output into the error report text file
-h = fopen([dirLoc '/runError.txt'],'a');
-fprintf(h,'\r\n%s: %s\r\n',modName,msg);
 t = clock();
-fprintf(h,'Error found at %2.0f-%2.0f-%4.0f, %2.0f:%2.0f\r\n',t(3),t(2),t(1),t(4:5));
 
-%Print parameter
-if isempty(p)
-	fprintf(h,'No p vector given. \n\r');
-elseif isnumeric(p)
-    fprintf(h,'p = [%4.4e',p(1));
-    fprintf(h,',%4.4e',p(2:end));
-    fprintf(h,']\r\n');
-else
-    fprintf(h,'p is the wrong format. \n\r');
-end
-%Print initial condition
-if isempty(x0)
-	fprintf(h,'no x0 vector given. \n\r');
-elseif isnumeric(x0)
-fprintf(h,'x0 = [%4.4e',x0(1));
-fprintf(h,',%4.4e',x0(2:end));
-fprintf(h,']\r\n');
-else
-	fprintf(h,'x0 is the wrong format. \n\r');
-end
-
-fprintf(h,'Files saved with filename %s.mat',errorID);
-fprintf(h,'\r\n-----------------------------------------');
-fclose(h);
+% %% Print the output into the error report text file
+% h = fopen([dirLoc '/runError.txt'],'a');
+% fprintf(h,'\r\n%s: %s\r\n',modName,msg);
+% fprintf(h,'Error found at %2.0f-%2.0f-%4.0f, %2.0f:%2.0f\r\n',t(3),t(2),t(1),t(4:5));
+% 
+% %Print parameter
+% if isempty(p)
+% 	fprintf(h,'No p vector given. \n\r');
+% elseif isnumeric(p)
+%     fprintf(h,'p = [%4.4e',p(1));
+%     fprintf(h,',%4.4e',p(2:end));
+%     fprintf(h,']\r\n');
+% else
+%     fprintf(h,'p is the wrong format. \n\r');
+% end
+% %Print initial condition
+% if isempty(x0)
+% 	fprintf(h,'no x0 vector given. \n\r');
+% elseif isnumeric(x0)
+% fprintf(h,'x0 = [%4.4e',x0(1));
+% fprintf(h,',%4.4e',x0(2:end));
+% fprintf(h,']\r\n');
+% else
+% 	fprintf(h,'x0 is the wrong format. \n\r');
+% end
+% 
+% fprintf(h,'Files saved with filename %s.mat',errorID);
+% fprintf(h,'\r\n-----------------------------------------');
+% fclose(h);
 
 %% Save state into error file
-if exist([dirLoc '/errors' num2str(labindx) '.mat'],'file')
-    load([dirLoc '/errors' num2str(labindx) '.mat']);
+if exist([dirLoc '/errors-lab-' num2str(labVal) '.mat'],'file')
+    load([dirLoc '/errors-lab-' num2str(labVal) '.mat']);
 else
-	errs = struct();
+	errs = struct([]);
 end
 if isempty(errs)
 	nerrs = 1;
@@ -93,4 +91,4 @@ errs(nerrs).errID = errorID;
 errs(nerrs).msg   = matmsg;
 errs(nerrs).time  = [num2str(t(3),'%2.0f') '-' num2str(t(2),'%2.0f') '-' num2str(t(1),'%4.0f') ', ' num2str(t(4),'%2.0f') ':' num2str(t(5),'%2.0f')];
 
-save([dirLoc '/errors.mat'],'errs')
+save([dirLoc '/errors-lab-' num2str(labVal) '.mat'],'errs')

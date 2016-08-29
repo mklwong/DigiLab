@@ -1,5 +1,6 @@
 %% Synthesis
 
+rxnRules = @odeKinetic;
 spcMode = 'a';
 
 %% Compartment definition

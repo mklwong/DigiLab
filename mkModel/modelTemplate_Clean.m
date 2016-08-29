@@ -16,9 +16,17 @@
 % element of the vector is negative is it indicates an unknown parameter
 % that is part of a group.
 
+%% Rule Set
+%
+rxnRule = @odeKinetic;
+
+%% Concentration Setting
+%
+spcMode = 'c'; %a for amount and c for concentration
+
 %% Compartment definition
 %
-% spcComp = {'Compartment name', relative size};
+% modComp = {'Compartment name', relative size};
 %
 modComp = {'Cyto', 1;
            'PM'  , 0.05;
@@ -27,13 +35,13 @@ modComp = {'Cyto', 1;
 
 %% Model species definition
 %
-% modSpc ={'State name', 'Compatment'  , conc/param};
+% modSpc ={'State name', 'Compartment'  , conc/param};
 
-modSpc = {'AKT'     ,'Cyto', 0;
-          'mAKT'    ,'PM'  , NaN;
-          'p473mAKT','PM'  , 0;
-          'p473AKT' ,'Cyto', 0;
-          'mTORC2'  ,'PM'  , 1};
+modSpc = {'mAKT'    ,'PM'  , 1;
+          'AKT'     ,'Cyto', 2;
+          'p473mAKT','PM'  , 3;
+          'p473AKT' ,'Cyto', 4;
+          'mTORC2'  ,'PM'  , 5};
 
 %% Features of default parameters
 % Bnd.(param) = [lb ub]
@@ -64,7 +72,14 @@ rxn(end+1).desc = 'mAKT -> p473mAKT | mTORC2';
     rxn(end).sub = 'mAKT';  
     rxn(end).prod= 'p473mAKT'; 
     rxn(end).enz = 'mTORC2';
-	rxn(end).Km  = NaN; 
+	rxn(end).Km  = 1; 
     rxn(end).k   = 0.1; 
-	rxn(end).r   = [NaN 1 0.1 1]; 
-	rxn(end).n   = [3 1]; 
+	rxn(end).r   = 1; 
+	rxn(end).n   = 1; 
+
+rxn(end+1).desc = 'p473mAKT -> mAKT2';
+    rxn(end).sub = 'p473mAKT';  
+    rxn(end).prod= 'mAKT'; 
+    rxn(end).k   = 0; 
+	rxn(end).r   = 1; 
+	rxn(end).n   = 1; 	

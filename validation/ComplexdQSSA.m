@@ -1,5 +1,6 @@
-%% Synthesis
+%% Complex dQSSA Network
 
+rxnRules = @odeKinetic;
 spcMode = 'a';
 
 %% Compartment definition

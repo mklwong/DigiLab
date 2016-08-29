@@ -1,5 +1,6 @@
-%% Synthesis
+%% Enzyme Kinetic (dQSSA)
 
+rxnRules = @odeKinetic;
 spcMode = 'c';
 
 %% Compartment definition

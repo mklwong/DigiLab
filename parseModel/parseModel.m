@@ -37,12 +37,10 @@ function model = parseModel(modelname,varargin)
 %
 
 %% Function options
-Names = ['expComp  ';
-         'modelRule'];
+Names = ['expComp  '];
 
 % Default options
 flag = true;
-modelRules = @odeKinetic;
 
 %Parse optional parameters (if any)
 for ii = 1:length(varargin)
@@ -50,8 +48,6 @@ for ii = 1:length(varargin)
 		switch lower(deblank(varargin{ii}))
 			case lower(deblank(Names(1,:))) %explicit modelling of complex or not
 				flag(1) = varargin{ii+1};
-			case lower(deblank(Names(2,:))) %model Rules
-				modelRules = varargin{ii+1};
 			case []
 				error('Expecting Option String in input');
 			otherwise
@@ -113,7 +109,7 @@ elseif strcmp(modType,'QSSA-m')
 			error('findTC:modelNotFound','Model file not found. Only .xml or .m files accepted')
 		end
 	end
-	model = parseModelm(modelname,modelRules,flag);
+	model = parseModelm(modelname,flag);
 elseif strcmp(modType,'QSSA-sbml')
 	for ii = 1:length(modelname)
 		if exist([func2str(modelname{ii})],'file')
