@@ -21,11 +21,11 @@ for ii = 2:length(varargin)
     tmpResult = varargin{2};
     allResult.pts = [allResult.pts;tmpResult.pts];
     allResult.logP = [allResult.logP;tmpResult.logP];
-    allResult.ptUn = [allResult.ptUn;tmpResult.ptUn];
+    %allResult.ptUn = [allResult.ptUn;tmpResult.ptUn];
 end
 
 allResult.best = allResult.pts(allResult.logP==min(allResult.logP),:);
 
 [allResult.logP,I] = sort(allResult.logP,'ascend');
 allResult.pts = allResult.pts(I,:);
-allResult.ptUn = allResult.ptUn(I);
+%allResult.ptUn = allResult.ptUn(I);
