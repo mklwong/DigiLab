@@ -113,28 +113,15 @@ if iscell(tmpInp) % state_name--val pair
 	protList = modelRaw.modSpc.name;
 	inpFunInd = [];
 	inpConstInd = [];
-	for ii = 1:size(tmpInp,1)
-		if ischar(tmpInp{ii,1})
-			[~,stateInd] = intersect(upper(protList),upper(tmpInp{ii,1})); % Match input state
-			tmpInp{ii,1} = stateInd; %Replace the name with index
-			%Separate spikes and gradual inputs
-			if ~isempty(stateInd)
-				if isa(tmpInp{ii,2},'function_handle')
-					inpFunInd = [inpFunInd ii];
-				else
-					inpConstInd = [inpConstInd ii];
-				end
-			end
-		end
+	if size(tmpInp,1)>1
+        error('findTC:TooManyStateValPair','Only one state function-handle pair allowed. Create an external function and pass it instead')
 	end
-	
+	[~,stateInd] = intersect(upper(protList),upper(tmpInp{1,1})); % Match input state
 	%Insert constant values
 	inpConst(vertcat(tmpInp{inpConstInd,1})) = vertcat(tmpInp{inpConstInd,2});
-	inpFunCell = cell(nx,1);
-	inpFunCell(:) = {@(t)0};
-	inpFunCell(tmpInp{inpFunInd,1}) = tmpInp(inpFunInd,2);
-	inpFun = @(t) cellfun(@(f) f(t),inpFunCell);
-	
+	inpVec = zeros(length(protList),1);
+    inpVec(stateInd) = 1;
+	inpFun = @(t) inpVec*tmpInp{1,2}(t);
 elseif isa(tmpInp,'function_handle') %vector of function handles
 	[a,b] = size(tmpInp(1));
 	if b>1
