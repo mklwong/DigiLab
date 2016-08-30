@@ -196,12 +196,12 @@ if ~noRamp
 	end
 	modelRamp.time = tic;
 	dx_dt = @(t,x) modelRaw.rxnRules('dynEqn',t,x,modelRamp);
-	y0 = x0*0;
+	Y = x0'*0;
 	t = [0 (1-1e-6) 10];
 	try
-		while sum(abs(dx_dt(t(1),y0))) > eps
-			[t,Y] = ode15s(dx_dt,t,y0,options);
-			y0 = Y(end,:)';
+		while sum(abs(dx_dt(t(1),Y'))) > eps
+			[t,Y] = ode15s(dx_dt,t,Y,options);
+			Y = Y(end,:);
 			t = [t(end) 10*t(end)];
 		end
 	catch errMsg
@@ -214,7 +214,7 @@ if ~noRamp
 		Y = nan(length(norm_tspan),length(x0));
 		doInteg = false;
 	end
-	y0 = Y(end,:)';
+	y0 = Y(end,:);
 	y0(y0<0) = 0;
 else
 	y0 = x0;

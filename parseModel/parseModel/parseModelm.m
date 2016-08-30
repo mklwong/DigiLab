@@ -23,7 +23,7 @@ function model = parseModelm(model,flags)
 %                     Multiplicative factor is assumed to be one.
 %   5) [NaN grp lb ub] : Unknown parameter with other parameters with the same
 %                     value, custom range.
-%   6) [NaN grp+factor*i]: Unknown parameter that is a multiplicative factor of
+%   6) [factor grp]: Unknown parameter that is a multiplicative factor of
 %                     another parameter. Parameter of this format is the
 %                     dependent.
 % grp is a positive integer. All parameters with grp that is the same
@@ -63,8 +63,6 @@ function model = parseModelm(model,flags)
 %
 % Now everytime reservation index -3 is encountered, the pID will not be
 % incremented, instead it will set the ID of that as 10.
-%
-% Compartmentalisation is not yet implemented. 
 %
 % %%%%%%%%%%%%%Output Groupings%%%%%%%%%%%%
 % The output of this function are in the form of structs.

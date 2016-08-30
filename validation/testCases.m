@@ -18,8 +18,8 @@ resid(1) = sum((YReal(:,1)-YMod(:,1))./(YReal(:,1)+eps));
 
 %% Uni
 method = 'uni';
-%Dissociation
 
+%Dissociation
 x0 = [pars(1) 0 0 0 0 0 0];
 k = [pars(2) 0 0 0];
 [tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k,v),[0 10],x0);
