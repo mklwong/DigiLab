@@ -131,18 +131,21 @@ for ii = 1:length(modelname)
 		rxn_all      = rxn;
 		rxnRules_all = rxnRules;
 	else
-		% Check for conflicts between models in compartments
+		% Check for same compartment entry between models
 		[jj,kk] = ismember(modComp(:,1),modComp_all(:,1));
-		jj = find(jj);
-		kk(kk==0) = [];
-		misMatches = cell2mat(modComp(jj,2))~=cell2mat(modComp_all(kk,2)); % Identify where mismatches are
-		if any(misMatches)
-			misMatchNames = modComp(jj(misMatches),1);
-			misMatchNames(:,2) = {', '};
-			misMatchNames(end,2) = {''};
-			misMatchNames = misMatchNames';
-			warning(['The following compartments have clashing sizes: ' horzcat(misMatchNames{:}) '. Larger value has been chosen.'])
-			modComp_all(kk(misMatches),2) = num2cell(max([cell2mat(modComp(misMatches,2)) cell2mat(modComp_all(kk(misMatches),2))],[],2));
+		for mm = 1:length(kk)
+			if jj(mm) % Verify if entries are the same
+				misMatches = modComp{mm,2}~=modComp_all{kk(mm),2}; 
+				if misMatches % Verify if not the same
+					[newVal,strOut] = compareParam(modComp{mm,2},modComp_all{kk(mm),2});
+					if isempty(newVal)
+						error('parseModelm:UnresolvableParamClash',['Unresolvable clash found in ' modComp{mm,1} ' in model: ' modelname{ii}  ', ' stOut])
+					else
+						warning(['Mismatch in ' modComp{mm,1} ': ' strOut])
+					end
+					modComp_all{kk(mm),2} = newVal;
+				end
+			end
 		end
 		modComp(jj,:) = [];  % Remove matching duplicates
 		modComp_all = [modComp_all;modComp];
@@ -150,22 +153,26 @@ for ii = 1:length(modelname)
 		% Check for conflicts between models in model species initial
 		% condition
 		[jj,kk] = ismember(modSpc(:,1),modSpc_all(:,1));
-		jj = find(jj);
-		kk(kk==0) = [];
-		misMatches = cell2mat(modSpc(jj,3))~=cell2mat(modSpc_all(kk,3)); % Identify where mismatches are
-		if any(misMatches)
-			misMatchNames = modSpc(jj(misMatches),1);
-			misMatchNames(:,2) = {', '};
-			misMatchNames(end,2) = {''};
-			misMatchNames = misMatchNames';
-			warning(['The following species have clashing initial conditions: ' horzcat(misMatchNames{:}) '. Larger value has been chosen.'])
-			modSpc_all(kk(misMatches),3) = num2cell(max([cell2mat(modSpc(misMatches,3)) cell2mat(modSpc_all(kk(misMatches),3))],[],2));
+		for mm = 1:length(kk)
+			if jj(mm) % Verify if entries are the same
+				misMatches = modSpc{mm,3}~=modSpc{kk(mm),3}; 
+				if misMatches % Verify if not the same
+					[newVal,strOut] = compareParam(modSpc{mm,3},modSpc{kk(mm),2});
+					if isempty(newVal)
+						error('parseModelm:UnresolvableParamClash',['Unresolvable clash found in ' modSpc{mm,1} ' in model: ' modelname{ii}  ', ' stOut])
+					else
+						warning(['Mismatch in ' modSpc{mm,1} ': ' strOut])
+					end
+					modSpc_all{kk(mm),3} = newVal;
+				end
+			end
 		end
 		
 		% Find mismatches in compartment name
-		misMatches = ~ismember(modSpc(jj,2),modSpc_all(kk,2)); % Identify where mismatches are
+		jjIndx = find(jj);
+		misMatches = ~ismember(modSpc(jjIndx,2),modSpc_all(kk(jj),2)); % Identify where mismatches are
 		if any(misMatches)
-			misMatchNames = modSpc(jj(misMatches),1);
+			misMatchNames = modSpc(jjIndx(misMatches),1);
 			misMatchNames(:,2) = {', '};
 			misMatchNames(end,2) = {''};
 			misMatchNames = misMatchNames';
@@ -199,7 +206,7 @@ for ii = 1:length(modelname)
 		rxn_all = [rxn_all rxn];
 		
 		% Check for conflicting reaction rules
-		if rxnRules_all ~= rxnRules;
+		if ~isequal(rxnRules_all,rxnRules)
 			error(['Models to be combined are based on different rulesets. This is not allowed. Merged models must be based on the same ruleset. Please correct this before trying again.'])
 		end
 	end
@@ -479,6 +486,40 @@ function param = contractTens(param,ind)
 			tmpTens = param.(paramFields{jj});
 			tmpTens(ind,:) = [];
 			param.(paramFields{jj}) = tmpTens;
+		end
+	end
+end
+
+function [valOut,strOut] = compareParam(val1,val2)
+	% Make val1 the longer parameter description
+	if length(val2) > length(val1)
+		val = val2;
+		val2 = val1;
+		val1 = val;
+	end
+	
+	% Compare the parameter descriptions
+	if  length(val1)==4 && (length(val1)==length(val2)) %Both have custom grouped boundaries
+		valOut = val1;
+		valOut(3:4) = [min(valOut(3),val2(3)) max(valOut(4),val2(4))];
+		strOut = 'Unequal boundary found. Largest custom boundary chosen.';
+	elseif length(val1)==3 && (length(val1)==length(val2)) %Both have custom boundaries
+		valOut = val1;
+		valOut(2:3) = [min(valOut(2),val2(2)) max(valOut(3),val2(3))];
+		strOut = 'Unequal boundary found. Largest custom boundary chosen.';
+	elseif length(val1)==2 && (length(val1)==length(val2)) %Both have custom boundaries
+		valOut = [];
+		strOut = 'Clash found between dependence description. Please check.';
+	elseif length(val1)==1 && (length(val1)==length(val2)) %Both have custom boundaries
+		valOut = NaN;
+		strOut = 'Parameter set as free parameter.';
+	elseif length(val1)>length(val2)
+		valOut = val1;
+		if length(val2) == 3
+			valOut(3:4) = [min(valOut(3),val2(2)) max(valOut(4),val2(3))];
+			strOut = 'Reference parameter set. Largest custom boundary chosen.';
+		else
+			strOut = 'Unequal parameter description found. More complex option chosen.';
 		end
 	end
 end
