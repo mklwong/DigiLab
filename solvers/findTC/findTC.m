@@ -110,18 +110,21 @@ inpFun = @(t)zeros(nx,1);
 % This component looks at the experiment-simulation name pair, then
 % compares the experiment name with the name given in the 
 if iscell(tmpInp) % state_name--val pair
-	protList = modelRaw.modSpc.name;
-	inpFunInd = [];
-	inpConstInd = [];
 	if size(tmpInp,1)>1
         error('findTC:TooManyStateValPair','Only one state function-handle pair allowed. Create an external function and pass it instead')
 	end
-	[~,stateInd] = intersect(upper(protList),upper(tmpInp{1,1})); % Match input state
-	%Insert constant values
-	inpConst(vertcat(tmpInp{inpConstInd,1})) = vertcat(tmpInp{inpConstInd,2});
-	inpVec = zeros(length(protList),1);
-    inpVec(stateInd) = 1;
-	inpFun = @(t) inpVec*tmpInp{1,2}(t);
+	% Match input state
+	protList = modelRaw.modSpc.name;
+	[~,stateInd] = intersect(upper(protList),upper(tmpInp{1,1})); 
+	%Insert constant values or function handle
+	if isnumeric(tmpInp{1,2})
+		inpConstInd = ones(nx,1);
+		inpConst(stateInd) = tmpInp{1,2};
+	else
+		inpVec = zeros(length(protList),1);
+		inpVec(stateInd) = 1;
+		inpFun = @(t) inpVec*tmpInp{1,2}(t);
+	end
 elseif isa(tmpInp,'function_handle') %vector of function handles
 	[a,b] = size(tmpInp(1));
 	if b>1

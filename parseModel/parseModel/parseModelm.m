@@ -333,79 +333,56 @@ modSpc = tmpSpc;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 paramNames = {param.name}; %get list of parameter names
-BndCell = [fieldnames(Bnd) struct2cell(Bnd)];
 for ii=1:length(rxn)
 	
 	%% Determine if parameters are free or not
-    [rxn(ii),pInd,pFit] = testPar(rxn(ii),pFit);
+    [rxn(ii),~,pFit,rxnTest] = testPar(rxn(ii),pFit);
 	
 	%% Turn reactions into maths using reaction rules
-    [reqParam,matVal,pBuild,parDesc,modSpc] = model.rxnRules('rxnRules',rxn(ii),modSpc,flags,ii);
-	
-    % Get definition of parameters
-    [~,pList2Desc] = ismember(parDesc(:,1),fieldnames(rxn(ii))); % parDesc to pInd mapping
-     
-    % Remove non-free parameters from parDesc and insert definition
-    parDesc(isnan(pInd(pList2Desc)),:) = [];    %Remove parameters that are not free from parDesc
-    pList2Desc(isnan(pInd(pList2Desc))) = [];   %Remove equivalent indices from pList2Desc
-    % Account for grouped parameters that have popped up again. They need
-    % to be skipped so "leading description" is not replaced.
-    for jj = 1:length(pList2Desc)
-		if isempty(pFit.desc{pInd(pList2Desc(jj))})
-			pFit.desc{pInd(pList2Desc(jj))} = [num2str(pInd(pList2Desc(jj))) ' | ' parDesc{jj,3}]; %Insert definition
-		else
-			clear oldPad newPad
-			dummyStr = num2str(pInd(pList2Desc(jj)));
-			dummyStr(1:end) = ' ';
-			newStr = [dummyStr ' | ' parDesc{jj,3}];
-			wNew = length(newStr);
-			[hOld,wOld] = size(pFit.desc{pInd(pList2Desc(jj))});
-			oldPad(1:hOld,1:(max(0,wNew-wOld))) = ' '; 
-			newPad(1,1:(max(0,wOld-wNew))) = ' '; 
-			pFit.desc{pInd(pList2Desc(jj))} = [pFit.desc{pInd(pList2Desc(jj))} oldPad;newStr newPad];
+	[~,pMatBuilder,~,rxnDesc] = model.rxnRules('rxnRules',rxnTest,modSpc,flags,ii); %Make all param values imaginary then use the matVal is produces to build parameter matrix
+    [reqParam,matVal,modSpc] = model.rxnRules('rxnRules',rxn(ii),modSpc,flags,ii);
+    
+	% Find free parameters and their corresponding descriptions
+	rxnFields = fieldnames(rxnTest);
+	for jj = 1:length(rxnFields)
+		if isnumeric(rxnTest.(rxnFields{jj})) && ~isempty(rxnTest.(rxnFields{jj}))
+			if rxnTest.(rxnFields{jj}) > 0
+				pInd = imag(rxnTest.(rxnFields{jj}));
+				if isempty(pFit.desc{pInd})
+					pFit.desc{pInd} = [num2str(pInd) ' | ' rxnDesc.(rxnFields{jj}){2}];
+				else
+					% Appending label to already assigned parameter
+					clear oldPad newPad
+					dummyStr = num2str(pInd);
+					dummyStr(1:end) = ' ';
+					newStr = [dummyStr ' | ' rxnDesc.(rxnFields{jj}){2}];
+					wNew = length(newStr);
+					[hOld,wOld] = size(pFit.desc{pInd});
+					oldPad(1:hOld,1:(max(0,wNew-wOld))) = ' '; 
+					newPad(1,1:(max(0,wOld-wNew))) = ' '; 
+					pFit.desc{pInd} = [pFit.desc{pInd} oldPad;newStr newPad];
+				end
+				if isnan(pFit.lim(pInd,:)) %is boundary still unfilled, then a default is requested
+					pFit.lim(pInd,:) = Bnd.(rxnDesc.(rxnFields{jj}){1});
+				end
+			end
 		end
-    end
+	end
     
     % Loop through pre-matrices that require new additions and build the
     % pre-matrix
     for jj = 1:length(reqParam);
 		%Make param builder
-        pIndBuild = nan(size(pBuild{jj}));
-		[~,pBuild2Params] = ismember(pBuild{jj},fieldnames(rxn(ii))); % parDesc to pInd mapping
-		pIndBuild(pBuild2Params~=0) = 0;
-        [~,pBuild2pInd] = ismember(pBuild{jj},parDesc(:,1)); % parDesc to pInd mapping
-        pIndBuild(pBuild2pInd~=0) = pInd(pList2Desc((pBuild2pInd(pBuild2pInd~=0))));
-        pIndBuild = pIndBuild(ones(1,size(matVal{jj},1)),:);
-
+		pIndImag = imag(pMatBuilder{jj})==0;
+		pMatBuilder{jj}(~pIndImag) = abs(imag(pMatBuilder{jj}(~pIndImag)));
+		pMatBuilder{jj}(pIndImag) = NaN;
+		
         %Append both into their required pre-matrices
         [~,paramInd,~] = intersect(paramNames,reqParam{jj});
         matInd = find(isnan(param(paramInd).matVal(:,1)),1,'first');
-		try
-			param(paramInd).matVal(matInd:(matInd+size(matVal{jj},1)-1),:) = matVal{jj};
-		catch msg
-			keyboard
-		end
-        param(paramInd).pInd(matInd:(matInd+size(matVal{jj},1)-1),:)   = pIndBuild;
-    end
-    
-    % Get boundary definition for parameter. Note this comes after making
-    % pre-matrices because non-free parameters have been removed from
-    % parDesc. But in the next step we will be removing more than that. So
-    % compiling pre-matrix is most convenient before the boundary
-    % incorporation step.
-    
-    %1) Check back to pFit.lim to see if any boundaries of mapped free
-    %parameters are already defined (i.e. they are custom).  Remove these
-    %indices.
-    parDesc(~isnan(pFit.lim(pInd(pList2Desc),1)),:) = [];
-    pList2Desc(~isnan(pFit.lim(pInd(pList2Desc),1))) = [];
-    
-    % Get the field from Bnd which corresponds to the free parameter in
-    % question
-    if ~isempty(pList2Desc)
-        [~,bnd2Desc] = ismember(parDesc(:,2),fieldnames(Bnd)); % parDesc to pInd mapping
-        pFit.lim(pInd(pList2Desc),:) = vertcat(BndCell{bnd2Desc,2});
-    end
+		param(paramInd).matVal(matInd:(matInd+size(matVal{jj},1)-1),:) = matVal{jj};
+        param(paramInd).pInd(matInd:(matInd+size(matVal{jj},1)-1),:)   = pMatBuilder{jj};
+	end
 end
 
 % remove NaN rows from generated tensors

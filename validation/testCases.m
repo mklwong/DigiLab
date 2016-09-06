@@ -78,7 +78,7 @@ k = [pars(3:5) 0 0 0 pars(7)];
 kQSSA = [k(3) (k(2)+k(3)+eps)/k(1) k(6) (k(5)+k(6)+eps)/k(4)];
 [tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k,v),[0 200],x0);
 [tMod,~,YMod] = findTC(@enzKinetic,tReal,'p',[v kQSSA k(end)],'y0',x0(1:4),'-b');
-resid(9) = sum((YReal(end,[1:3 5])-YMod(end,[1:3 5]))./YReal(end,[1:3 5]) );
+resid(9) = sum((YReal(end,[1:3 5])-YMod(end,[1:3 5]))./(YReal(end,[1:3 5]) + 1e-3*max(max(YReal(end,[1:3 5])))) );
 
 %% Reversible
 method = 'enzQSSA';
@@ -87,7 +87,7 @@ k = [pars(3:8) 0];
 kQSSA = [k(3) (k(2)+k(3))/k(1) k(6) (k(5)+k(6))/k(4)];
 [tReal,YReal] = ode15s(@(t,x) testReactions(t,x,method,k,v),[0 200],x0);
 [tMod,~,YMod] = findTC(@enzKinetic,tReal,'p',[v kQSSA k(end)],'y0',x0(1:4),'-b');
-resid(10) = sum((YReal(end,1:6)-YMod(end,1:6))./YReal(end,1:6) );
+resid(10) = sum((YReal(end,1:6)-YMod(end,1:6))./(YReal(end,1:6) + 1e-3*max(max(YReal(end,1:6)))) );
 
 %% Hill Function
 method = 'hillFun';

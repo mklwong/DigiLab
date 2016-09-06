@@ -51,25 +51,41 @@ classdef sigRxnList
 		
 		% Numerical, parameter types
 		function obj = set.Km(obj,KmIn)
-			if ~isnumeric(KmIn)
+			if iscell(KmIn)
+				if ~ismember('-',KmIn{2})
+					error('sigMatMod:kAssignmentWrong','Error entering rate constant. Can only be a numerical array.')
+				end
+			elseif ~isnumeric(KmIn)
 				error('sigMatMod:KmAssignmentWrong','Error entering Equilibrium Constant. Can only be a numerical array.')
 			end
 			obj.Km = KmIn;
 		end
 		function obj = set.k(obj,kIn)
-			if ~isnumeric(kIn)
+			if iscell(kIn)
+				if ~ismember('-',kIn{2})
+					error('sigMatMod:kAssignmentWrong','Error entering rate constant. Can only be a numerical array.')
+				end
+			elseif ~isnumeric(kIn)
 				error('sigMatMod:kAssignmentWrong','Error entering rate constant. Can only be a numerical array.')
 			end
 			obj.k = kIn;
 		end
 		function obj = set.r(obj,rIn)
-			if ~isnumeric(rIn)
+			if iscell(rIn)
+				if ~ismember('-',rIn{2})
+					error('sigMatMod:kAssignmentWrong','Error entering rate constant. Can only be a numerical array.')
+				end
+			elseif ~isnumeric(rIn)
 				error('sigMatMod:rAssignmentWrong','Error entering geometry factor. Can only be a numerical array.')
 			end
 			obj.r = rIn;
 				end
 		function obj = set.n(obj,nIn)
-			if ~isnumeric(nIn)
+			if iscell(nIn)
+				if ~ismember('-',nIn{2})
+					error('sigMatMod:kAssignmentWrong','Error entering rate constant. Can only be a numerical array.')
+				end
+			elseif ~isnumeric(nIn)
 				error('sigMatMod:nAssignmentWrong','Error entering hill coefficient. Can only be a numerical array.')
 			end
 			obj.n = nIn;

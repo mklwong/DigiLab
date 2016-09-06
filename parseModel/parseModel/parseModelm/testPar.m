@@ -1,4 +1,14 @@
-function [strct,pInd,pList] = testPar(strct,pList)
+function [strct,pInd,pList,testStrct] = testPar(strct,pList)
+
+% Description of outputs
+% - strct is the final reaction structure after the parameter values are
+% changed
+% - testStrct is the reaction structure for building the parameter matrix
+% (which has all parameter values set to NaN).
+% - pInd gives the parameter index which will be applied for each parameter
+% - pList updated pList with grouped parameter sets updated
+
+testStrct = strct;
 
 % Loop through each field and initialise pInd from that
 flds = fieldnames(strct);
@@ -30,11 +40,11 @@ for ii = 1:length(flds)
             % Enter custom boundaries
             if ~all(custBnd==0)
                 pList.lim(pInd(ii),:) = custBnd;
-            end
-        else
-            % Free parameter not required. Continue
-            continue
-        end
+			end
+			testStrct.(flds{ii}) = pInd(ii)*1i;
+		else
+			testStrct.(flds{ii}) = -abs(testStrct.(flds{ii}));
+		end
     end
 end
 
@@ -61,7 +71,7 @@ elseif length(vec)==1
         matVal  = vec(1);
     else
         bnd     = 0;
-        matVal = 1;
+        matVal  = 1;
     end
 elseif length(vec) == 2
     grp     = vec(2);
@@ -74,7 +84,7 @@ elseif length(vec) == 2
 elseif length(vec) == 3
     if ~isnan(vec(1))
         %Leading numeric ambigious
-        error('SIGMAT.testPar:AmbigVal','First value in 1x3 parameter array is non NaN. Interpretation is ambigious.')
+        error('SIGMAT.testPar:AmbigVal','First value in 1x3 parameter array is not NaN. Interpretation is ambigious.')
     else
         bnd = vec(2:3);
         grp = NaN;
