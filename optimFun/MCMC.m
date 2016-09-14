@@ -234,7 +234,7 @@ end
 runVar.logP = runVar.obj(runVar.pt);
 
 % Initialise run functions and parameters
-runVar = opts.adaptFun(runVar,opts);
+runVar = opts.propDis('adapt',runVar,opts);
 runVar.ptTest = mod(1:20,2); % Vector of result of past acceptance tests. As an initial start point, we assume suggests and failures were alternating evenly.
 if isempty(runVar.bnd)
 	runVar.logScale = false(size(runVar.pt));
@@ -588,7 +588,7 @@ logP0 = runVar.logP;
 
 printCheckpoint('2.1.1',runVar.outputName,opts.disp);
 % Generate next point
-[pt1,pdfBias] = opts.propDis(runVar);
+[pt1,pdfBias] = opts.propDis('newpt',runVar);
 printCheckpoint('2.1.2',runVar.outputName,opts.disp);
 %Check point still in boundary
 if ~isempty(runVar.bnd)
@@ -624,7 +624,7 @@ else
 end
 runVar.delPt = pt1-pt0;
 
-runVar = opts.adaptFun(runVar,opts);
+runVar = opts.propDis('adapt',runVar,opts);
 
 end
 

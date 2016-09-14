@@ -1,64 +1,113 @@
-function [pt1,pdfBias] = propDis(runVar)
+function varargout = propDis(fcn,runVar,opts)
 
-% pdfBias is q(x,y)/q(y,x)
+switch lower(deblank(fcn))
+    case 'newpt'
+        % pdfBias is q(x,y)/q(y,x)
 
-%initialise stuff
-pt1 = 0*runVar.pt;
+        %initialise stuff
+        pt1 = 0*runVar.pt;
 
-reRoll = true(size(runVar.pt));
-n = 6; %scaling factor to turn range of randn to the width of the boundary.
+        reRoll = true(size(runVar.pt));
+        n = 6; %scaling factor to turn range of randn to the width of the boundary.
 
-if ~isempty(runVar.bnd)
-	% Determine whether to use logarithmic scale to sample boundary or to use
-	% linear
-	bndRng = (runVar.bnd(:,2)-runVar.bnd(:,1));
-	bndRng(isinf(bndRng)) = 1; %Unbounded ones are set to 1
-else
-	bndRng = ones(size(pt1));
+        if ~isempty(runVar.bnd)
+            % Determine whether to use logarithmic scale to sample boundary or to use
+            % linear
+            bndRng = (runVar.bnd(:,2)-runVar.bnd(:,1));
+            bndRng(isinf(bndRng)) = 1; %Unbounded ones are set to 1
+        else
+            bndRng = ones(size(pt1));
+        end
+
+        %%
+        % Generate random variable. Undirected
+        while any(reRoll)
+            prop = randn(size(runVar.pt))/n.*runVar.step.*bndRng;
+            pt1(reRoll&~runVar.logScale) = runVar.pt(reRoll&~runVar.logScale)+prop(reRoll&~runVar.logScale);
+            pt1(reRoll&runVar.logScale) = runVar.pt(reRoll&runVar.logScale).*exp(prop(reRoll&runVar.logScale));
+            if ~isempty(runVar.bnd)
+                reRoll = pt1<runVar.bnd(:,1)|pt1>runVar.bnd(:,2);
+            else
+                reRoll = false(size(pt1));
+            end
+        end
+
+        % Generate random variable. Directed
+        % nPt = length(pt0);
+        % curBasis = opts.basis;
+        % try
+        % 	basis = [curBasis null(curBasis')];
+        % catch
+        % 	keyboard
+        % end
+        % pow = opts.basisSkew;
+        % alpha = 0.75;
+        % 
+        % while sum(reRoll)
+        % 	pt1(reRoll) = pt0(reRoll) + propFunc(randn(sum(reRoll),1),skew)/n.*opts.step;
+        % 	reRoll = pt1<bnd(:,1)|pt1>bnd(:,2);
+        % end
+
+        %%
+        % Calculate biasing by truncating the cumulative distribution function.
+        % This is for the hastings ratio
+
+        %Create mixed log and lin scale points
+        pt0_M = runVar.pt;
+        pt0_M(runVar.logScale) = log(runVar.pt(runVar.logScale));
+        pt1_M = pt1;
+        pt1_M(runVar.logScale) = log(pt1(runVar.logScale));
+        bnd_M = runVar.bnd;
+        bnd_M(runVar.logScale,:) = log(runVar.bnd(runVar.logScale,:));
+
+        pdfBias = biasCalc(pt0_M,pt1_M,bnd_M,n,runVar.step);
+        
+        varargout = {pt1,pdfBias};
+        
+    case 'adapt'
+        % Initial step vector initiation
+        if ~isfield(runVar,'step')
+            if isrow(opts.stepi)
+                opts.stepi = opts.stepi';
+            end
+            runVar.step  = opts.stepi;
+            varargout = {runVar};
+            return
+        end
+        
+        % Check step ratio
+        rjtRto = sum(runVar.ptTest)/length(runVar.ptTest);
+
+        % Adapt step
+        %% Normal undirected adaptation
+        if rjtRto <= opts.rjtRto  %Success - reduce step size
+            runVar.step = max([1e-2*(runVar.step).^0 runVar.step/1.1],[],2);
+        elseif rjtRto > opts.rjtRto % Fail - enlarge step
+            runVar.step = min([opts.maxStep*(runVar.step).^0 runVar.step*1.1],[],2);
+        end
+        
+        varargout = {runVar};
+        %% Test directed adaptation
+        % curBasis = opts.basis(:,1);
+        % testBasis = (runVar.dp')/norm(runVar.dp',2);
+        % amount = dot(testBasis,curBasis);
+        % testBasis = sign(amount)*testBasis;
+        % if rjtRto <= opts.rjtRto    %Fail
+        % 	opts.basisSkew = max([0 opts.basisSkew-abs(amount)]);
+        %     opts.step      = max([1e-2+0*opts.step opts.step/1.01],[],2);
+        % elseif rjtRto > opts.rjtRto %Success
+        % 	newBasis = curBasis+(opts.step(1)/norm(runVar.dp',2))/9*testBasis;
+        % % 	if abs(amount) < 0.2
+        % % 		keyboard
+        % % 	end
+        % 	opts.basis     = newBasis/norm(newBasis,2);
+        % 	if isnan(norm(newBasis,2))
+        % 		keyboard
+        % 	end
+        % 	opts.basisSkew = opts.basisSkew+abs(amount);
+        %     opts.step = min([opts.maxStep+0*opts.step opts.step*(1+0.1*abs(amount))],[],2);
+        % end
 end
-
-%%
-% Generate random variable. Undirected
-while any(reRoll)
-	prop = randn(size(runVar.pt))/n.*runVar.step.*bndRng;
-	pt1(reRoll&~runVar.logScale) = runVar.pt(reRoll&~runVar.logScale)+prop(reRoll&~runVar.logScale);
-	pt1(reRoll&runVar.logScale) = runVar.pt(reRoll&runVar.logScale).*exp(prop(reRoll&runVar.logScale));
-	if ~isempty(runVar.bnd)
-		reRoll = pt1<runVar.bnd(:,1)|pt1>runVar.bnd(:,2);
-	else
-		reRoll = false(size(pt1));
-	end
-end
-
-% Generate random variable. Directed
-% nPt = length(pt0);
-% curBasis = opts.basis;
-% try
-% 	basis = [curBasis null(curBasis')];
-% catch
-% 	keyboard
-% end
-% pow = opts.basisSkew;
-% alpha = 0.75;
-% 
-% while sum(reRoll)
-% 	pt1(reRoll) = pt0(reRoll) + propFunc(randn(sum(reRoll),1),skew)/n.*opts.step;
-% 	reRoll = pt1<bnd(:,1)|pt1>bnd(:,2);
-% end
-
-%%
-% Calculate biasing by truncating the cumulative distribution function.
-% This is for the hastings ratio
-
-%Create mixed log and lin scale points
-pt0_M = runVar.pt;
-pt0_M(runVar.logScale) = log(runVar.pt(runVar.logScale));
-pt1_M = pt1;
-pt1_M(runVar.logScale) = log(pt1(runVar.logScale));
-bnd_M = runVar.bnd;
-bnd_M(runVar.logScale,:) = log(runVar.bnd(runVar.logScale,:));
-
-pdfBias = biasCalc(pt0_M,pt1_M,bnd_M,n,runVar.step);
 
 end
 
