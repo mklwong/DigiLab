@@ -159,8 +159,8 @@ rxn(end+1).desc = 'mAKT -> p473mAKT | mTORC2';
     rxn(end).sub = 'mAKT';  
     rxn(end).prod= 'p473mAKT'; 
     rxn(end).enz = 'mTORC2';
+    rxn(end).k   = 0; 
 	rxn(end).Km  = 1; 
-    rxn(end).k   = 0.1; 
 	rxn(end).r   = 1; 
 	rxn(end).n   = 1; 
 

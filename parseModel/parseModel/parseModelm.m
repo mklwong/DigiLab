@@ -346,7 +346,7 @@ for ii=1:length(rxn)
 	rxnFields = fieldnames(rxnTest);
 	for jj = 1:length(rxnFields)
 		if isnumeric(rxnTest.(rxnFields{jj})) && ~isempty(rxnTest.(rxnFields{jj}))
-			if rxnTest.(rxnFields{jj}) ~= 0
+			if imag(rxnTest.(rxnFields{jj})) ~= 0
 				pInd = imag(rxnTest.(rxnFields{jj}));
 				if isempty(pFit.desc{pInd})
 					pFit.desc{pInd} = [num2str(pInd) ' | ' rxnDesc.(rxnFields{jj}){2}];

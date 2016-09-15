@@ -134,7 +134,7 @@ logP(isnan(logP))  = [];
 % Compile the posterior
 posterior.pts  = pts;
 posterior.logP = logP;
-posterior.ptUn = ptUn;
+posterior.ptUn = ptUnique;
 
 end
 
