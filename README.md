@@ -1,8 +1,9 @@
 SigMat
 =========
 
-Biochemical Signalling Networks modelled in Matlab. This is designed to 
-easily and intuitively 
+Biochemical Signalling Networks modelled in MATLAB. This is designed to 
+easily and intuitively model large biochemical networks with complex
+rate equations.
 
 To use this package, either download the package, unzip the contents into
 any folder. Then add all contents of the folder into the MATLAB search
@@ -13,13 +14,15 @@ package should then work.
 
 The basic usage steps are:
 
-1. `mkModel(filename)` - this creates a barebones sigMat model to build from.
-2. `[t,Y] = findTC(modelName,t)` - this simulates the model name.
-3. `[pts,logP] = MCMC(objFun,pt0,bnd)` - this performs parameter fitting on 
+1. 'mkModel(filename)' - this creates a barebones sigMat model to build from.
+2. '[t,Y] = findTC(modelName,t)' - this simulates the model name.
+3. 'posterior = MCMC(objFun,pt0,bnd)' - this performs parameter fitting on 
                                          the objective function objFun.
 
-Type `>> help [function]` for more information about usage of these functions.
-Alternately, you can find the documentation for this package in documentation.pdf
+Type '>> help [function]' for more information about usage of these functions.
+
+You can find a more comprehensive walkthrough of this package in the 
+documentation for this package in documentation.pdf
 
 Licensing
 =========

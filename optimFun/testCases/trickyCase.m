@@ -1,0 +1,1 @@
+objFun = @(x)-log10(normpdf(log10(x(2)),0.3,0.22))
