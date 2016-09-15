@@ -105,9 +105,6 @@ fprintf('\n')
 
 % Parse Model
 model = parseModel(model);
-if ~exist('objFun')
-	objFun = @(p) modelObjective(model,p,U);
-end
 if ~exist('opts','var')
 	opts = MCMCOptimset();
 end
@@ -127,7 +124,7 @@ while ii ~= length(T)+1
     fprintf('\n**** MCMC Start ****\n')
     fprintf('Tempering at T = %6.2f\n',T(ii))
     opts = MCMCOptimset(opts,'T',T(ii)','Prior',prir);
-    [pts,logP,ptsUniq,status] = MCMC(@(p)objFun(p,[modelLoc,runID]),[],model.pFit.lim,opts);
+    [resultNew,status] = MCMC(@(p)objFun(p,[modelLoc,runID]),[],model.pFit.lim,opts);
     
     fprintf('Temperature %6.2f done after %7.1f seconds.\n',T(ii),toc(t1))
     
@@ -137,21 +134,13 @@ while ii ~= length(T)+1
         fprintf('Existing results file found for this temperature. Load...\n')
         load([modelLoc '/' runID '/' fileName]);
         fprintf('Appending new results...\n')
-        logPnew = [result.logP; logP];
-        ptsNew  = [result.pts ; pts ];
-    else
-        logPnew = logP;
-        ptsNew = pts;
+        result.logP = combineResults(result,resultNew);
+	else
+		result = resultNew;
+		result.T     = T(ii);
+		result.model = model;
 	end
-	result.logP  = logPnew;
-	result.pts   = ptsNew;
-	result.ptUn = ptsUniq;
-	result.T     = T(ii);
-	result.model = model;
-	result.best  = pts(logP==min(logP),:);
-    if exist('U','var')
-        result.obj   = U;
-    end
+	result.best  = result.pts(result.logP==min(result.logP),:);
     save([modelLoc runID '/' fileName],'result');
     fileLocs{ii} = fileName;
 

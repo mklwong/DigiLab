@@ -1,10 +1,6 @@
-function [pts,logP,ptUnique,status] = MCMC(objfun,pt0,bndry,opts)
+function [posterior,status] = MCMC(objfun,pt0,bndry,opts)
 
-% [pstrir,P] = MCMC(objfun,pt0,bndry,opts)
-%
-% Note the outputed probability is value of the objective function. It is
-% assumed that the relationship between the objective function and the
-% likelihood is P = exp[-objfun(p)]
+% [posterior,status] = MCMC(objfun,pt0,bndry,opts)
 %
 % MCMC chain with tempering.
 %
@@ -15,13 +11,15 @@ function [pts,logP,ptUnique,status] = MCMC(objfun,pt0,bndry,opts)
 %          within. This is an N x 2 matrix where N is the number of
 %          parameters to be fitted. The first column contains the lower
 %          bounds while the second column contains the upper bounds.
-% Opts   = A struct that contains MCMC settings. It is advised that this be
+% opts   = A struct that contains MCMC settings. It is advised that this be
 %          generated using MCMCOptimset
 %
 % pt0 and bndry are both optional inputs, but AT LEAST ONE of these input
 % arguments must be entered. This is because the randomised start point
 % requires a finite space to sample from. Conversely an unbounded search
 % must have a defined starting point.
+%
+% The output posterior
 
 %% Input Parameter Integrity Check
 %== Parameter 3: Boundary ==%
@@ -132,6 +130,11 @@ ptUnique = ptUniqueRaw{1};
 pts(isnan(logP),:) = [];
 ptUnique(isnan(logP)) = [];
 logP(isnan(logP))  = [];  
+
+% Compile the posterior
+posterior.pts  = pts;
+posterior.logP = logP;
+posterior.ptUn = ptUn;
 
 end
 

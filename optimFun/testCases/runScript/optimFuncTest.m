@@ -1,6 +1,5 @@
-function pts = optimFuncTest(obj,bnd,opts)
+function result = optimFuncTest(obj,bnd,opts)
 
-[pts,logP,ptUnq] = MCMC(obj,[],bnd,opts);
-result.logP  = logP;	result.pts = pts;	result.ptUn = ptUnq;
+result = MCMC(obj,[],bnd,opts);
 opts = MCMCOptimset(opts,'T',1,'prior',result);
-[pts,~,~] = MCMC(obj,[],bnd,opts);
+result = MCMC(obj,[],bnd,opts);

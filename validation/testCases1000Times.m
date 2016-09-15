@@ -1,5 +1,5 @@
-residAggregate = nan(100,12);
-for ii = 1:100;
+residAggregate = nan(1000,12);
+for ii = 1:1000;
 	testCases;
 	residAggregate(ii,:) = resid;
 	fprintf('.')
