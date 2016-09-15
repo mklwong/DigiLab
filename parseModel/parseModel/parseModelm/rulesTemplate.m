@@ -1,4 +1,4 @@
-function varargout = rxnRules(method,varargin)
+function varargout = [rxnRules](method,varargin)
 
 switch lower(deblank(method))
 	
