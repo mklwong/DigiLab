@@ -14,9 +14,9 @@ package should then work.
 
 The basic usage steps are:
 
-1. 'mkModel(filename)' - this creates a barebones sigMat model to build from.
-2. '[t,Y] = findTC(modelName,t)' - this simulates the model name.
-3. 'posterior = MCMC(objFun,pt0,bnd)' - this performs parameter fitting on 
+1. modelName = mkModel('filename') - this creates a barebones sigMat model to build from.
+2. [t,Y] = findTC(modelName,t) - this simulates the model name.
+3. posterior = MCMC(objFun,pt0,bnd) - this performs parameter fitting on 
                                          the objective function objFun.
 
 Type '>> help [function]' for more information about usage of these functions.
