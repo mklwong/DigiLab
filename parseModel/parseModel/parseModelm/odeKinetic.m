@@ -200,7 +200,7 @@ switch rxnType
 			rxn.k = {'k2',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'k')};
 		elseif (prodIndx(1)==subIndx(1))
 			% Simplified enzyme mediated degradation
-			rxn.k = {'k2',makeDesc(modSpc.name(subIndx(2)),'',modSpc.name(prodIndx(1)),'kc/Km')};
+			rxn.k = {'k2',makeDesc(modSpc.name(subIndx(2)),modSpc.name(prodIndx(2)),modSpc.name(prodIndx(1)),'kc/Km')};
 		end
 
 		% Maths
