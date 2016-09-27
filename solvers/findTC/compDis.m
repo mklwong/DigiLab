@@ -21,9 +21,16 @@ if ~isempty(G)
 	G = G(I,:);
 
 	M = eye(size(x,1));
-	scale = model.comp;
-	scale = scale(:,ones(1,length(scale)));
 	M((G(:,2)-1)*max(G(:,1))+G(:,1))=1;
+	
+	scale = model.comp;
+	scale(isinf(scale)) = 1e6*max(scale(~isinf(scale))); % Do hack to account for infinite volumnes.
+														 % The infinite volume is made 1 million times 
+													  	 % larger than the next largest finite volume
+														 % This will lead to an error rate that should 
+														 % should be less than 1e-4 percent.
+	scale = scale(:,ones(1,length(scale)));
+	
 	Y = Y*(M.*scale);
 	Y = Y./(scale(:,ones(1,size(Y,1))))';
 	

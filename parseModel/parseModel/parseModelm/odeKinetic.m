@@ -354,5 +354,5 @@ HillTmp = sparse(model.param(HillInd).matVal(:,1),model.param(HillInd).matVal(:,
 HillTerm(1:a,1:b) = HillTmp;
 
 % Solve
-varargout{1} = (eye(length(x))+G)\((V*x+(W+HillTerm)*x+model.sigma(t).*model.comp)./model.comp);
+varargout{1} = (eye(length(x))+G)\((V*x+(W+HillTerm)*x)./model.comp+model.sigma(t));
 end
