@@ -1,4 +1,4 @@
-function [p,mergeModel] = mergeParam(mergeModel,varargin)
+function [p,modelOut] = mergeParam(mergeModel,varargin)
 % mergeParam Combine parameters from different SIGMAT model parameter sets.
 %	[POUT,MERGEMODEL] = mergeParam(MODELIN,DAT1,DAT2,...) with POUT a 
 %	vector equal to number of parameters required by SIGMAT modelm MODELIN.
@@ -23,7 +23,9 @@ function [p,mergeModel] = mergeParam(mergeModel,varargin)
 %	DAT = {result,irow} where result is the MCMC output and irow is the row
 %	to be chosen.
 
-mergeModel = parseModel(mergeModel);
+% Parse the model if necessary
+modelOut = parseModel(mergeModel);
+mergeModel = modelOut;
 p = NaN(size(mergeModel.pFit.lim(:,1)));
 
 % Make all rows in mergeModel's parameter descriptions row characters
@@ -32,8 +34,10 @@ for ii = 1:length(p)
 	mergeModel.pFit.desc{ii} = parseStr(mergeModel.pFit.desc{ii});
 end
 
+% Cycle through inserted model results
 for ii = length(varargin):-1:1
 	subDat = varargin{ii};
+	% Parameter set selection from input data
 	if iscell(subDat) % If the varargin is a cell and contains two elements, then the input contains a model and an index for row to pick of parameter list
 		if length(subDat) ~= 2
 			error('mergeParam:TooManyElementsInData',['There are too many elements given in the cell in input argument ' num2str(ii+1) '.'])
