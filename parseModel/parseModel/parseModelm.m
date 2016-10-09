@@ -141,7 +141,7 @@ for ii = 1:length(modelname)
 					if isempty(newVal)
 						error('parseModelm:UnresolvableParamClash',['Unresolvable clash found in ' modComp{mm,1} ' in model: ' modelname{ii}  ', ' stOut])
 					else
-						warning(['Mismatch in ' modComp{mm,1} ': ' strOut])
+						fprintf(['Mismatch in ' modComp{mm,1} ': ' strOut '\n'])
 					end
 					modComp_all{kk(mm),2} = newVal;
 				end
@@ -155,13 +155,13 @@ for ii = 1:length(modelname)
 		[jj,kk] = ismember(modSpc(:,1),modSpc_all(:,1));
 		for mm = 1:length(kk)
 			if jj(mm) % Verify if entries are the same
-				misMatches = modSpc{mm,3}~=modSpc{kk(mm),3}; 
+				misMatches = modSpc{mm,3}~=modSpc_all{kk(mm),3}; 
 				if misMatches % Verify if not the same
 					[newVal,strOut] = compareParam(modSpc{mm,3},modSpc{kk(mm),2});
 					if isempty(newVal)
 						error('parseModelm:UnresolvableParamClash',['Unresolvable clash found in ' modSpc{mm,1} ' in model: ' modelname{ii}  ', ' stOut])
 					else
-						warning(['Mismatch in ' modSpc{mm,1} ': ' strOut])
+						fprintf(['Mismatch in ' modSpc{mm,1} ': ' strOut '\n'])
 					end
 					modSpc_all{kk(mm),3} = newVal;
 				end
@@ -190,7 +190,7 @@ for ii = 1:length(modelname)
 			if isMemb
 				bndEqual = Bnd_all.(bndAllNames{jj}) == Bnd.(bndNames{membInd});
 				if ~all(bndEqual)
-					warning(['The following boundary: ' bndAllNames{jj} ', is inconsistent. Boundary encompassing both are set.'])
+					fprintf(['The following boundary: ' bndAllNames{jj} ', is inconsistent. Boundary encompassing both are set.\n'])
 					Bnd_all.(bndAllNames{jj}) = [min([Bnd_all.(bndAllNames{jj})(1) Bnd.(bndNames{membInd})(1)]) max([Bnd_all.(bndAllNames{jj})(2) Bnd.(bndNames{membInd})(2)])];
 				end
 			end

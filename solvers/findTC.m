@@ -205,6 +205,7 @@ if ~noRamp
 		while sum(abs(dx_dt(t(1),Y'))) > eps
 			[t,Y] = ode15s(dx_dt,t,Y,options);
 			Y = Y(end,:);
+			Y(Y<0) = 0;
 			t = [t(end) 10*t(end)];
 		end
 	catch errMsg

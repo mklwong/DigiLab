@@ -91,7 +91,7 @@ modelname = modelnameCell;
 modType = modelType(modelname);
 
 if modIsStruct
-	warning('parseModel:PreparsedModel','Preparsed model found. No further parsing is performed. Please insert original .m or .sbml file to reparse.')
+	fprintf('parseModel:PreparsedModel','Preparsed model found. No further parsing is performed. Please insert original .m or .sbml file to reparse.\n')
 elseif strcmp(modType,'ode15s')
 	if exist('p','var')
 		model = @(t,x) model(t,x,p);
@@ -106,7 +106,7 @@ elseif strcmp(modType,'QSSA-m')
 				modelname{ii} = modelname{ii}(1:end-2);
 			end
 		else
-			error('findTC:modelNotFound','Model file not found. Only .xml or .m files accepted')
+			error('findTC:modelNotFound',['Model file ' modelname{ii} ' not found. Only .xml or .m files accepted'])
 		end
 	end
 	model = parseModelm(modelname,flag);
@@ -118,7 +118,7 @@ elseif strcmp(modType,'QSSA-sbml')
 				modelname{ii} = modelname{ii}(1:end-5);
 			end
 		else
-			error('findTC:modelNotFound','Model file not found. Only .xml or .m files accepted')
+			error('findTC:modelNotFound',['Model file ' func2str(modelname{ii}) ' not found. Only .xml or .m files accepted'])
 		end
 	end
 	model = parseModelSBML(modelname);

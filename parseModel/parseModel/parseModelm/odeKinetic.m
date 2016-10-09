@@ -171,7 +171,7 @@ rxn.r = {'r',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enz
 switch rxnType
 	case 'syn'
 		% Label
-		rxn.k = {'k0',makeDesc('Phi',modSpc.name(prodIndx),'','k')};
+		rxn.k = {'k0',makeDesc('Phi',modSpc.name(prodIndx),'','k0')};
 
 		% Maths
 		reqTens  = {'k0'};
@@ -179,13 +179,13 @@ switch rxnType
 	case 'uni'
 		% Label
 		if isempty(prodIndx)
-			rxn.k = {'k1',makeDesc(modSpc.name(subIndx),'','','k')};
+			rxn.k = {'k1',makeDesc(modSpc.name(subIndx),'','','k1')};
 		elseif subIndx(1)==prodIndx(1)
 			% Enzyme mediated Synthesis
-			rxn.k = {'k1',makeDesc('',modSpc.name(prodIndx(2)),modSpc.name(prodIndx(1)),'k/Km')};
+			rxn.k = {'k1',makeDesc('',modSpc.name(prodIndx(2)),modSpc.name(prodIndx(1)),'k1')};
 		else
 			% Unimolecular conversion/dissociation
-			rxn.k = {'k1',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'k')};
+			rxn.k = {'k1',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'k1')};
 		end
 
 		% Maths
@@ -197,10 +197,10 @@ switch rxnType
 		% Label
 		if isempty(rxn.enz)
 			% Association
-			rxn.k = {'k2',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'k')};
+			rxn.k = {'k2',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'k2')};
 		elseif (prodIndx(1)==subIndx(1))
 			% Simplified enzyme mediated degradation
-			rxn.k = {'k2',makeDesc(modSpc.name(subIndx(2)),modSpc.name(prodIndx(2)),modSpc.name(prodIndx(1)),'kc/Km')};
+			rxn.k = {'k2',makeDesc(modSpc.name(subIndx(2)),modSpc.name(prodIndx(2)),modSpc.name(prodIndx(1)),'k2')};
 		end
 
 		% Maths
@@ -210,7 +210,7 @@ switch rxnType
 
 	case 'enzQSSA'
 		%Label
-		rxn.k  = {'k1',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'kc')};
+		rxn.k  = {'k1',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'k1')};
 		rxn.Km = {'Km',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'Km')};
 		if flag(1)
 			%Make new complex species
@@ -243,7 +243,7 @@ switch rxnType
 		end
 		
 	case 'hillFun'
-		rxn.k  = {'k1',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'k')};
+		rxn.k  = {'k1',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'k1')};
 		rxn.Km = {'Km',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'Km')};
 		rxn.n  = {'n',makeDesc(modSpc.name(subIndx),modSpc.name(prodIndx),modSpc.name(enzIndx),'n')};
 		
