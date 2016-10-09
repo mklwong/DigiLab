@@ -1,4 +1,4 @@
-function [p,modelOut] = mergeParam(mergeModel,varargin)
+function [p,modelOut,sclFac,pSource] = mergeParam(mergeModel,varargin)
 % mergeParam Combine parameters from different SIGMAT model parameter sets.
 %	[POUT,MERGEMODEL] = mergeParam(MODELIN,DAT1,DAT2,...) with POUT a 
 %	vector equal to number of parameters required by SIGMAT modelm MODELIN.
@@ -23,10 +23,40 @@ function [p,modelOut] = mergeParam(mergeModel,varargin)
 %	DAT = {result,irow} where result is the MCMC output and irow is the row
 %	to be chosen.
 
+% Options
+Names = ['sup'
+	          ];
+     
+%Initialise potental options
+supMode = false;
+
+%Parse optional parameters (if any)
+detectOpts = true;
+rmInd = [];
+for ii = 1:length(varargin)
+	if detectOpts && ischar(varargin{ii}) %only enter loop if varargin{ii} is a parameter
+		detectOpts = false;
+		switch lower(deblank(varargin{ii}))
+			case lower(deblank(Names(1,:)))   %Supervision mode
+				supMode = varargin{ii+1};
+				rmInd = [rmInd ii ii+1];
+			case []
+				error('Expecting Option String in input');
+			otherwise
+				error('Non-existent option selected. Check spelling.')
+		end
+	else
+		detectOpts = true;
+	end
+end
+varargin(rmInd) = [];
+
 % Parse the model if necessary
 modelOut = parseModel(mergeModel);
 mergeModel = modelOut;
 p = NaN(size(mergeModel.pFit.lim(:,1)));
+pSource = p;
+sclFac = ones(size(varargin));
 
 % Make all rows in mergeModel's parameter descriptions row characters
 % (strings)
@@ -54,7 +84,108 @@ for ii = length(varargin):-1:1
 	end
 	[~,I_merged,I_sub] = intersect(mergeModel.pFit.desc,subDat.model.pFit.desc);
 	I_sub(isnan(subDat.pts(irow,I_sub))) = [];
+	
+	% Find any that will be replaced and can be used to rescale the
+	% CONCENTRATION related parameters (time is not automagically rescaled)
+	% That's all anything in this for loop does. Seems long but a lot of it
+	% is manipulating strings.
+	if any(~isnan(p(I_merged)))
+		% Find the overlapping parameters
+		overlapMerge = I_merged(~isnan(p(I_merged))); % Merged model
+		overlapSub   = I_sub(~isnan(p(I_merged)));    % Subcomponent model
+		% Supervised mode
+		if supMode
+			% Printing the output for debugging
+			% Extract result model names
+			for jj = 1:length(varargin)
+				if isstruct(varargin{jj})
+					srcName{jj} = varargin{jj}.model.name;
+				elseif iscell(varargin{jj})
+					srcName{jj} = varargin{jj}{1}.model.name;
+				end
+			end
+			maxParName = max(cellfun(@length,subDat.model.pFit.desc(I_sub(~isnan(p(I_merged)))))); % longest parameter name
+			parNamePad = (maxParName-5)/2;
+			srcInd = pSource(~isnan(p(I_merged)));
+			srcInd(isnan(srcInd)) = ii;
+			maxModName = max(cellfun(@length,srcName(srcInd)));
+			modNamePad = (maxModName-8)/2;
+			emptSpc = ' ';
+			fprintf('----------------------------------------------------------------------------\n')
+			fprintf('~~~~~ The following parameters have conflicting values between results ~~~~~\n')
+			fprintf('----------------------------------------------------------------------------\n')
+			fprintf('ID | %sParam%s | %sSource 1%s |   Value    | %sSource 2%s |   Value    \n',emptSpc(ones(1,floor(parNamePad))),emptSpc(ones(1,ceil(parNamePad)))...
+				                                                                     ,emptSpc(ones(1,floor(modNamePad))),emptSpc(ones(1,ceil(modNamePad)))...
+																					 ,emptSpc(ones(1,floor(modNamePad))),emptSpc(ones(1,ceil(modNamePad))))
+			for jj = 1:length(overlapMerge)
+				paramLen = length(subDat.model.pFit.desc{overlapSub(jj)});
+				src1Len = length(srcName{pSource(overlapMerge(jj))});
+				src2Len = length(srcName{ii}); % Source 2
+				
+				fprintf('%2.0d | %s%s%s | %s%s%s | %10.2e | %s%s%s | %10.2e \n',jj,emptSpc(ones(1,floor((maxParName-paramLen)/2)))...
+				                                                             ,subDat.model.pFit.desc{overlapSub(jj)}...
+																			 ,emptSpc(ones(1,ceil((maxParName-paramLen)/2)))...
+																			 ,emptSpc(ones(1,floor((maxModName-src1Len)/2)))...
+																			 ,srcName{pSource(overlapMerge(jj))}...
+																			 ,emptSpc(ones(1,ceil((maxModName-src1Len)/2)))...
+																			 ,p(overlapMerge(jj))...
+																			 ,emptSpc(ones(1,floor((maxModName-src2Len)/2)))...
+																			 ,srcName{ii}...
+																			 ,emptSpc(ones(1,ceil((maxModName-src2Len)/2)))...
+																			 ,subDat.pts(irow,overlapSub(jj)))
+			end
+			
+			% Ask user which parameter to rescale, and which model to
+			% rescale to
+			sclChoice = input('Choose the parameter to rescale to? (Enter the ID in the above list) >>> ');
+			modChoice = input('Choose the model to rescale with respect to? (Enter 1 (source 1) or 2 (source 2) ) >>> ');
+			if modChoice == 2
+				modChoice = ii;
+			else
+				modChoice = 0;
+			end
+		else
+			sclChoice = find(cellfun(@(x)~isempty(regexp(x,'Conc','Once')),subDat.model.pFit.desc(overlapSub)),1,'first');
+			modChoice = ii;
+		end
+		
+		% Perform the rescaling
+		% 1) Identify the parameters that are of the class that need to be
+		% rescaled
+		%	a) By multiplication (zeroth order rate constants, concentrations and equilibrium constants)
+		%	b) By division (second order constants)
+		subSclIndMult = getParamType(subDat.model.pFit.desc,{'k0','Conc','Km'});
+		cmpSclIndMult = getParamType(mergeModel.pFit.desc,{'k0','Conc','Km'});
+		
+		subSclIndDiv  = getParamType(subDat.model.pFit.desc,{'k2'});
+		cmpSclIndDiv  = getParamType(mergeModel.pFit.desc,{'k2'});
+		
+		% 2) Work out the scale
+		if modChoice == ii
+			subModFac = 1;
+			cmpModFac = subDat.pts(irow,overlapSub(sclChoice))/p(overlapMerge(sclChoice));
+		else
+			subModFac = p(overlapMerge(sclChoice))/subDat.pts(irow,overlapSub(sclChoice));
+			cmpModFac = 1;
+		end
+		
+		p(cmpSclIndMult) = p(cmpSclIndMult).*cmpModFac;
+		p(cmpSclIndDiv) = p(cmpSclIndDiv)./cmpModFac;
+		
+		subDat.pts(irow,subSclIndMult) = subDat.pts(irow,subSclIndMult).*subModFac;
+		subDat.pts(irow,subSclIndDiv)  = subDat.pts(irow,subSclIndDiv)./subModFac;
+		
+		%Store the scale
+		sclFac(ii) = subModFac;
+		sclFac((ii+1):end) = sclFac((ii+1):end)*cmpModFac;
+		I_merged(I_merged==overlapMerge(sclChoice)) = [];
+		I_sub(I_sub==overlapMerge(sclChoice)) = [];
+	end
+	
+	% Place the parameters in current subModel into master model parameter
+	% set
 	p(I_merged) = subDat.pts(irow,I_sub);
+	pSource(I_merged) = ii;
 end
 
 end
@@ -72,4 +203,16 @@ function outStr = parseStr(inStr)
 	% Remove all blanks
 	I = strfind(outStr,' ');
 	outStr(I) = [];
+end
+
+function ind = getParamType(labelList,targLabel)
+    ind = false(size(labelList));
+	for ii = 1:length(labelList)
+		rmInd = strfind(labelList{ii},':');
+		labelList{ii} = labelList{ii}(1:(rmInd-1));
+	end
+	for ii = 1:length(targLabel)
+		ind = ind+(~cellfun(@isempty,strfind(labelList,targLabel{ii})));
+	end
+	ind = logical(ind);
 end
