@@ -94,7 +94,7 @@ for ii = 1:length(varargin)
 	end
 end
 
-modelRaw = parseModel(modelRaw);
+modelRaw = parseModel(modelRaw,'reparse',false);
 
 % %Correct dimension of x0 and tspan
 if isrow(x0)
