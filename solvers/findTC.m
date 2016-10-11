@@ -48,7 +48,8 @@ Names = ['p       '
 		 'y0      '
 		 'odeopts '
 	     'errDir  '
-		 '-b      '];
+		 '-b      '
+		 'errShow '];
      
 %Initialise potental options
 p    = [];
@@ -57,6 +58,7 @@ tmpInp  = [];
 noRamp = false;
 errDir = false;
 noBasal = false;
+errShow = false;
 
 detectOpts = true;
 %Parse optional parameters (if any)
@@ -80,6 +82,8 @@ for ii = 1:length(varargin)
 			case lower(deblank(Names(7,:)))   %No basal
 				noBasal = true;
 				detectOpts = true;
+			case lower(deblank(Names(8,:)))   %Show error
+				errShow = varargin{ii+1};
 			case []
 				error('Expecting Option String in input');
 			otherwise
@@ -210,10 +214,12 @@ if ~noRamp
 		end
 	catch errMsg
 		t = [0 norm_tspan(2)];
-		if errDir 
+		if errDir && ~errShow
 			storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
-		else
+		elseif ~errShow
 			storeError(modelRaw,x0,p,errMsg,errMsg.message)
+		elseif errShow
+			rethrow(errMsg)
 		end
 		Y = nan(length(norm_tspan),length(x0));
 		doInteg = false;
@@ -241,10 +247,12 @@ while doInteg
 		% Error catching
 		if failedOnce
 			t = [0 norm_tspan(2)];
-			if errDir 
+			if errDir && ~errShow
 				storeError(modelRaw,x0,p,errMsg,errMsg.message,errDir)
-			else
+			elseif ~errShow
 				storeError(modelRaw,x0,p,errMsg,errMsg.message)
+			elseif errShow
+				rethrow(errMsg)
 			end
 			Y = nan(length(norm_tspan),length(x0));
 			doInteg = false;

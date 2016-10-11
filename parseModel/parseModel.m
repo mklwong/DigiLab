@@ -1,4 +1,4 @@
-function model = parseModel(modelname,varargin)
+function model = parseModel(modelList,varargin)
 
 %   [model] = parseModel(modelname)
 %   
@@ -56,60 +56,49 @@ for ii = 1:length(varargin)
 	end
 end
 
-if iscell(modelname)
-	modelnameCell = modelname;
-else
-	modelnameCell{1} = modelname;
+% Place modelname in cell as required
+if ~iscell(modelList)
+	modelList = {modelList};
+end
+modelNameList = modelList;
+
+% Go through each cell and determine what type of data is contained
+for ii = 1:length(modelList)
+	modelTest = modelList{ii};
+	if ischar(modelTest)
+		%String
+	elseif isa(modelTest,'function_handle')
+		%convert function handle to string
+		modelNameList{ii} = func2str(modelTest);
+	elseif isstruct(modelTest)
+		%Previous model structure
+		if isfield(modelTest,'name') && isfield(modelTest,'rxnRules') && isfield(modelTest,'modSpc') && isfield(modelTest,'pFit') && isfield(modelTest,'param') && isfield(modelTest,'modComp')
+			modelNameList{ii} = 'struct';
+		else
+			error('parseModel:unexpectedStruct','Unexpected structure detected. Make sure structure passed is a SigMat structure')
+		end
+	else
+		%Unusual structure
+		error('parseModel:unexpectedModelType','Unexpected model type detected. Only strings, function handles or model structures allow')
+	end
 end
 
-modIsStruct = false;
-% Isolate model name and check that each are not pre-parsed structures
-for ii = 1:length(modelnameCell)
-	modelname = modelnameCell{ii};
-	if ischar(modelname)
-		%convert function handle to string
-		modelname = str2func(modelname);
-	elseif isstruct(modelname)
-		if length(modelnameCell)>1
-			error('parseModel:cannotCombineParsedModel','Currently proram not capable of combining parsed models. Feature will be incorporated in future versions')
-		end
-		model = modelname;
-		if isfield(model,'name') && isfield(model,'rxnRules') && isfield(model,'modSpc') && isfield(model,'pFit') && isfield(model,'param') && isfield(model,'modComp')
-			%Model structure detected
-			modelname = str2func(model.name);
-			modIsStruct = true;
-		else
-			%Unusual structure
-			error('parseModel:unexpectedModelType','Unexpected model type detected. Only strings, function handles or model structures allow')
-		end
-	end
-	modelnameCell{ii} = modelname;
-end
-modelname = modelnameCell;
 
 %% Kernel
-modType = modelType(modelname);
+modType = modelType(modelNameList);
 
-if modIsStruct
-	fprintf('parseModel:PreparsedModel','Preparsed model found. No further parsing is performed. Please insert original .m or .sbml file to reparse.\n')
-elseif strcmp(modType,'ode15s')
-	if exist('p','var')
-		model = @(t,x) model(t,x,p);
-	else
-		model = @(t,x,p) model(t,x,p);
-	end
-elseif strcmp(modType,'QSSA-m') 
-	for ii = 1:length(modelname)
-		modelname{ii} = func2str(modelname{ii});
-		if exist([modelname{ii}],'file')
-			if strcmp(modelname{ii}(end-1:end),'.m')
-				modelname{ii} = modelname{ii}(1:end-2);
+if strcmp(modType,'QSSA-m') 
+	for ii = 1:length(modelList)
+		if isstruct(modelList{ii})
+		elseif exist([modelList{ii}],'file')
+			if strcmp(modelList{ii}(end-1:end),'.m')
+				modelList{ii} = modelList{ii}(1:end-2);
 			end
 		else
-			error('findTC:modelNotFound',['Model file ' modelname{ii} ' not found. Only .xml or .m files accepted'])
+			error('findTC:modelNotFound',['Model file ' modelList{ii} ' not found. Only .xml or .m files accepted'])
 		end
 	end
-	model = parseModelm(modelname,flag);
+	model = parseModelm(modelList,flag);
 elseif strcmp(modType,'QSSA-sbml')
 	for ii = 1:length(modelname)
 		if exist([func2str(modelname{ii})],'file')

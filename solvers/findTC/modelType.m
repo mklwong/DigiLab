@@ -1,16 +1,14 @@
 function modType = modelType(model)
 modType = [];
 for ii = 1:length(model)
-	if ischar(model{ii})
-		model{ii} = str2func(model{ii});
-	elseif isstruct(model{ii})
+	if strcmp(model{ii},'struct')
 		modType = 'QSSA-m';
 		continue
 	end
 
 	% Test if function handle by trying it as a function handle of 3 inputs.
 	try 
-		modelTest = model{ii};
+		modelTest = str2func(model{ii});
 		modelTest([],[],[]); %an ODE model should accept t, x and p
 		if ~strcmp(modType,'ode15s') || isempty(modType)
 			error('modelType:ModelsOfDifferentTypesPassed','Models of different types passed. Algorithm cannot currently combine different types. Please recheck')

@@ -111,11 +111,69 @@ clear model
 model.name = '';
 
 for ii = 1:length(modelname)
-	model.name = [model.name modelname{ii} '|'];
-	% Initialise parameters
-	rxn = sigRxnList();
-	rxn(1) = []; %When rxn is initialised it always creates an empty reaction. Remove this.
-	run(modelname{ii}); 
+	
+	if ischar(modelname{ii})
+		% Initialise parameters
+		model.name = [model.name modelname{ii} '|'];
+		rxn = sigRxnList();
+		rxn(1) = []; %When rxn is initialised it always creates an empty reaction. Remove this.
+		run(modelname{ii}); 
+	elseif isstruct(modelname{ii})
+		grpsChecked = []; % Parameter checking
+		
+		model.name = [model.name modelname{ii}.name '|'];
+		rxn = modelname{ii}.raw.rxn;       % Putting in reactions
+		Bnd = modelname{ii}.raw.bnd;       % Putting in default boundaries
+		rxnRules = modelname{ii}.rxnRules; % Putting used reaction rules
+		
+		% De-parsing model compartments
+		modComp = modelname{ii}.modComp.name;
+		modComp = [modComp num2cell(modelname{ii}.modComp.matVal)];
+		% Apply the parameter definition and boundaries for free species
+		for jj = find(~isnan(modelname{ii}.modComp.pInd))'
+			if any(modelname{ii}.pFit.grp(:,2)==modelname{ii}.modComp.pInd(jj))
+				% Check for grouped parameters
+				curGrp = modelname{ii}.pFit.grp(:,modelname{ii}.pFit.grp(:,2)==modelname{ii}.modComp.pInd(jj),1);
+				if any(curGrp==grpsChecked)
+					%If group encountered has already been found
+					modComp(jj,2) = {[curGrp modelname{ii}.modComp.matVal(jj)]};
+				else
+					%If group encountered has not yet been found
+					modComp(jj,2) = {[NaN curGrp modelname{ii}.pFit.lim(modelname{ii}.modComp.pInd(jj),:)]};
+					grpsChecked = [grpsChecked curGrp];
+				end
+			else
+				% For ungrouped parameters (we will ignore case where the
+				% default boundary is used).
+				modComp(jj,2) = {[NaN modelname{ii}.pFit.lim(modelname{ii}.modComp.pInd(jj),:)]};
+			end
+		end
+
+		% De-parsing model species
+		modSpc = modelname{ii}.modSpc.name';
+		modSpc = [modSpc modelname{ii}.modComp.name(modelname{ii}.modSpc.comp(:,1))];
+		modSpc = [modSpc num2cell(modelname{ii}.modSpc.matVal)];
+		% Apply the parameter definition and boundaries for free species
+		for jj = find(~isnan(modelname{ii}.modSpc.pInd))'
+			if any(modelname{ii}.pFit.grp(:,2)==modelname{ii}.modSpc.pInd(jj))
+				% Check for grouped parameters
+				curGrp = modelname{ii}.pFit.grp(:,modelname{ii}.pFit.grp(:,2)==modelname{ii}.modSpc.pInd(jj),1);
+				if any(curGrp==grpsChecked)
+					%If group encountered has already been found
+					modSpc(jj,3) = {[curGrp modelname{ii}.modSpc.matVal(jj)]};
+				else
+					%If group encountered has not yet been found
+					modSpc(jj,3) = {[NaN curGrp modelname{ii}.pFit.lim(modelname{ii}.modSpc.pInd(jj),:)]};
+					grpsChecked = [grpsChecked curGrp];
+				end
+			else
+				% For ungrouped parameters (we will ignore case where the
+				% default boundary is used).
+				modSpc(jj,3) = {[NaN modelname{ii}.pFit.lim(modelname{ii}.modSpc.pInd(jj),:)]};
+			end
+		end
+		modSpc(modelname{ii}.modSpc.comp(:,2)~=0,:)=[];   % Remove custom created species
+	end
 
 	%loads the following 
 	%	- modComp: compartment info for model.
@@ -130,6 +188,7 @@ for ii = 1:length(modelname)
 		Bnd_all      = Bnd;
 		rxn_all      = rxn;
 		rxnRules_all = rxnRules;
+		spcMode      = spcMode;
 	else
 		% Check for same compartment entry between models
 		[jj,kk] = ismember(modComp(:,1),modComp_all(:,1));
@@ -157,7 +216,7 @@ for ii = 1:length(modelname)
 			if jj(mm) % Verify if entries are the same
 				misMatches = modSpc{mm,3}~=modSpc_all{kk(mm),3}; 
 				if misMatches % Verify if not the same
-					[newVal,strOut] = compareParam(modSpc{mm,3},modSpc{kk(mm),2});
+					[newVal,strOut] = compareParam(modSpc{mm,3},modSpc_all{kk(mm),3});
 					if isempty(newVal)
 						error('parseModelm:UnresolvableParamClash',['Unresolvable clash found in ' modSpc{mm,1} ' in model: ' modelname{ii}  ', ' stOut])
 					else
@@ -206,8 +265,11 @@ for ii = 1:length(modelname)
 		rxn_all = [rxn_all rxn];
 		
 		% Check for conflicting reaction rules
-		if ~isequal(rxnRules_all,rxnRules)
+		if ~strcmp(rxnRules_all,rxnRules)
 			error(['Models to be combined are based on different rulesets. This is not allowed. Merged models must be based on the same ruleset. Please correct this before trying again.'])
+		end
+		if ~strcmp(spcMode_all,spcMode)
+			error(['Models to be combined are based on different species mode. This is not allowed. Merged models must all either all be concentration or absolute amount based. Please correct this before trying again.'])
 		end
 	end
 end
@@ -336,11 +398,11 @@ paramNames = {param.name}; %get list of parameter names
 for ii=1:length(rxn)
 	
 	%% Determine if parameters are free or not
-    [rxn(ii),~,pFit,rxnTest] = testPar(rxn(ii),pFit);
+    [rxnPar,~,pFit,rxnTest] = testPar(rxn(ii),pFit);
 	
 	%% Turn reactions into maths using reaction rules
 	[~,pMatBuilder,~,rxnDesc] = model.rxnRules('rxnRules',rxnTest,modSpc,flags,ii); %Make all param values imaginary then use the matVal is produces to build parameter matrix
-    [reqParam,matVal,modSpc] = model.rxnRules('rxnRules',rxn(ii),modSpc,flags,ii);
+	[reqParam,matVal,modSpc] = model.rxnRules('rxnRules',rxnPar,modSpc,flags,ii);
     
 	% Find free parameters and their corresponding descriptions
 	rxnFields = fieldnames(rxnTest);
@@ -438,6 +500,8 @@ model.modSpc = modSpc;
 model.pFit = pFit;
 model.param = param;
 model.modComp = modComp;
+model.raw.rxn = rxn;
+model.raw.bnd = Bnd;
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%End Main Function%%%%%
