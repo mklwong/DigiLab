@@ -16,8 +16,17 @@ else
 
 if isfield(model,'name')
 	modName = model.name;
+	% Remove illegal characters
+		pipes = strfind(modName,'|');
+		modName(pipes) = '_';
+		dots = strfind(modName,'.');
+		modName(pipes) = '_';
 	dirLoc = which(modName);
-	dirLoc(end-1:end) = [];
+	if isempty(dirLoc)
+		dirLoc = pwd;
+	else
+		dirLoc(end-1:end) = [];
+	end
 elseif ischar(model)
 	dirLoc = ['./' model];
 else
