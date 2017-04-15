@@ -1,9 +1,13 @@
-SigMat
+DigiLab - The Digital Cellular Laboratory in MATLAB
+
 =========
 
-Biochemical Signalling Networks modelled in MATLAB. This is designed to 
-easily and intuitively model large biochemical networks with complex
-rate equations.
+The Digital Cellular Laboratory in MATLAB is a MATLAB package that is designed to 
+easily model large biochemical networks with complex rate equations. It achieves this
+by allowing modularisation of biochemical networks and abstracting away any modelling 
+component that is more complex that designing the network connections and state of the
+network (i.e. parameter and initial condition selection). However, the deeper mathematics
+can be edited by changing the underlying default rate equations used by the package.
 
 To use this package, either download the package, unzip the contents into
 any folder. Then add all contents of the folder into the MATLAB search
